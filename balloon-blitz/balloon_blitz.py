@@ -54,6 +54,7 @@ KEYMAP = {
     "START": [pygame.K_RETURN], "SELECT": [pygame.K_TAB, pygame.K_RSHIFT],
 }
 REPEAT_DELAY, REPEAT_RATE = 0.35, 0.09   # menu auto-repeat when holding
+SHOP_SLOTS = 7                  # towers shown at once in the shop bar
 
 # Colors
 WHITE = (255, 255, 255)
@@ -151,6 +152,20 @@ TOWER_TYPES = [
               ("Ring of Fire", 1100, "Fire: 2 damage, pops lead",
                {"dtype": ("=", "normal"), "dmg": ("+", 1)})],
          ]),
+    dict(key="boom", name="Boomerang", cost=325,
+         desc="Curved throw that comes back",
+         base=dict(range=120, rate=1.15, dmg=1, pierce=5, speed=360,
+                   dtype="sharp", count=1, knock=0),
+         paths=[
+             [("Wide Arc", 250, "Boomerangs pop 4 more", {"pierce": ("+", 4)}),
+              ("Hot Rang", 450, "Red-hot: pops lead", {"dtype": ("=", "normal")}),
+              ("Blade Storm", 1500, "+10 pierce, +2 damage",
+               {"pierce": ("+", 10), "dmg": ("+", 2)})],
+             [("Quick Throw", 200, "Throws 25% faster", {"rate": ("*", 0.75)}),
+              ("Double Throw", 500, "Throws 2 boomerangs", {"count": ("=", 2)}),
+              ("Push Back", 1300, "Hits knock balloons back",
+               {"knock": ("=", 18), "rate": ("*", 0.8)})],
+         ]),
     dict(key="bomb", name="Bomb Tower", cost=500,
          desc="Explodes groups. Pops lead",
          base=dict(range=145, rate=1.35, dmg=1, pierce=18, speed=400,
@@ -165,6 +180,21 @@ TOWER_TYPES = [
                {"rate": ("*", 0.75), "camo": ("=", True)}),
               ("Cluster Bombs", 900, "Blasts throw 6 mini bombs", {"cluster": ("=", 6)})],
          ]),
+    dict(key="glue", name="Glue Gunner", cost=275,
+         desc="Glue slows balloons down",
+         base=dict(range=115, rate=1.0, pierce=1, speed=380, slow=0.5, glue_time=11,
+                   acid=0, splash=0, glue_blimp=False, count=1, spread=0.0),
+         paths=[
+             [("Sticky Glue", 200, "Slows more, lasts longer",
+               {"slow": ("=", 0.65), "glue_time": ("+", 4)}),
+              ("Acid Glue", 450, "Glue pops a layer every 1.5s", {"acid": ("=", 1.5)}),
+              ("Melting Goo", 2200, "Fast acid, works on blimps",
+               {"acid": ("=", 0.4), "glue_blimp": ("=", True)})],
+             [("Glue Spray", 220, "Glue hits 2 more balloons", {"pierce": ("+", 2)}),
+              ("Fast Squirt", 400, "Shoots 40% faster", {"rate": ("*", 0.6)}),
+              ("Glue Storm", 1600, "Glue splashes a whole area",
+               {"splash": ("=", 60), "glue_blimp": ("=", True)})],
+         ]),
     dict(key="frost", name="Frost Tower", cost=350,
          desc="Freezes nearby balloons",
          base=dict(range=80, rate=2.2, dmg=0, freeze=1.2, slow_after=0,
@@ -178,6 +208,20 @@ TOWER_TYPES = [
               ("Permafrost", 250, "Slows balloons after thaw", {"slow_after": ("=", 3.0)}),
               ("Cold Snap", 500, "Freezes white+zebra, sees camo",
                {"freeze_white": ("=", True), "camo": ("=", True)})],
+         ]),
+    dict(key="ninja", name="Ninja", cost=400,
+         desc="Fast stars. Sees camo",
+         base=dict(range=125, rate=0.55, dmg=1, pierce=2, speed=620, dtype="sharp",
+                   camo=True, count=1, spread=0.0, homing=False, stun=0),
+         paths=[
+             [("Keen Stars", 300, "Stars pop 2 more", {"pierce": ("+", 2)}),
+              ("Homing Stars", 500, "Stars chase balloons", {"homing": ("=", True)}),
+              ("Star Storm", 1800, "Throws 4 stars, faster",
+               {"count": ("=", 4), "spread": ("=", 0.18), "rate": ("*", 0.7)})],
+             [("Quick Hands", 350, "Throws 25% faster", {"rate": ("*", 0.75)}),
+              ("Stun Bomb", 600, "Every 4th throw stuns an area", {"stun": ("=", 1.0)}),
+              ("Shadow Master", 2600, "+3 damage, throws faster",
+               {"dmg": ("+", 3), "rate": ("*", 0.7)})],
          ]),
     dict(key="sniper", name="Sniper", cost=350,
          desc="Hits anything on the map",
@@ -206,6 +250,46 @@ TOWER_TYPES = [
                {"camo": ("=", True), "range": ("+", 20)}),
               ("Dragon's Breath", 1300, "Adds a flamethrower", {"breath": ("=", True)})],
          ]),
+    dict(key="spike", name="Spike Factory", cost=650,
+         desc="Drops spikes on the track",
+         base=dict(range=95, rate=2.0, dmg=1, pierce=5, dtype="sharp", life=25, mines=False),
+         paths=[
+             [("Bigger Piles", 300, "Piles pop 4 more", {"pierce": ("+", 4)}),
+              ("Hot Spikes", 550, "+1 damage, pops lead",
+               {"dmg": ("+", 1), "dtype": ("=", "normal")}),
+              ("Spike Mines", 1800, "Used-up piles explode", {"mines": ("=", True)})],
+             [("Long-lasting", 250, "Spikes last twice as long", {"life": ("*", 2)}),
+              ("Faster Making", 700, "Makes spikes 40% faster", {"rate": ("*", 0.6)}),
+              ("Spike Storm", 2500, "Makes spikes 3x faster", {"rate": ("*", 0.35)})],
+         ]),
+    dict(key="village", name="Village", cost=900,
+         desc="Boosts towers in its circle",
+         base=dict(range=115, boost=0.1, radar=False, drums=0, rune=False, discount=0, income=0),
+         paths=[
+             [("Radar Hut", 400, "Towers in circle see camo", {"radar": ("=", True)}),
+              ("Drum Circle", 900, "Towers in circle 15% faster", {"drums": ("=", 0.15)}),
+              ("Ancient Rune", 2200, "Towers in circle pop lead+black", {"rune": ("=", True)})],
+             [("Watchtower", 250, "Bigger circle, +20% range",
+               {"range": ("+", 30), "boost": ("=", 0.2)}),
+              ("Trade Post", 500, "15% off in the circle", {"discount": ("=", 0.15)}),
+              ("Gold Market", 2500, "+$300 every round", {"income": ("=", 300)})],
+         ]),
+    dict(key="super", name="Super Tower", cost=2200,
+         desc="A storm of darts. Pricey!",
+         base=dict(range=150, rate=0.08, dmg=1, pierce=1, speed=700, dtype="sharp",
+                   count=1, spread=0.0, blimp_mult=1),
+         paths=[
+             [("Laser Vision", 1500, "+1 pierce, 15% faster",
+               {"pierce": ("+", 1), "rate": ("*", 0.85)}),
+              ("Plasma Core", 3500, "+1 damage, pops lead",
+               {"dmg": ("+", 1), "dtype": ("=", "normal")}),
+              ("Solar Flare", 11000, "3 beams, +2 damage, +3 pierce",
+               {"count": ("=", 3), "spread": ("=", 0.15), "dmg": ("+", 2), "pierce": ("+", 3)})],
+             [("Night Goggles", 600, "Sees camo balloons", {"camo": ("=", True)}),
+              ("Twin Blasters", 3000, "Shoots 2 at once",
+               {"count": ("=", 2), "spread": ("=", 0.12)}),
+              ("Blimp Wrecker", 6000, "4x damage to blimps", {"blimp_mult": ("=", 4)})],
+         ]),
     dict(key="mine", name="Coin Mine", cost=600,
          desc="Earns money every round",
          base=dict(range=0, income=60, lives=0, mult=1.0),
@@ -219,20 +303,40 @@ TOWER_TYPES = [
          ]),
 ]
 TARGET_MODES = ["First", "Last", "Strong", "Close"]
+NO_TARGETING = ("mine", "frost", "spike", "village")   # towers that don't aim
 
 # =====================================================================
 # Maps (coordinates inside the 480x480 play field)
 # =====================================================================
+# paths: one or more tracks (balloons take turns between them).
+# water / rocks: circles (x, y, radius) where you can't build.
+# A track that ends inside the field ends in a hole.
 MAPS = [
     dict(name="Meadow", level="Easy", seed=3,
-         path=[(-30, 60), (400, 60), (400, 180), (80, 180), (80, 300),
-               (400, 300), (400, 420), (240, 420), (240, 520)]),
+         paths=[[(-30, 60), (400, 60), (400, 180), (80, 180), (80, 300),
+                 (400, 300), (400, 420), (240, 420), (240, 520)]]),
+    dict(name="Lake Loop", level="Easy", seed=5,
+         paths=[[(-30, 420), (420, 420), (420, 60), (60, 60), (60, 330),
+                 (330, 330), (330, 520)]],
+         water=[(185, 195, 72), (295, 195, 72), (240, 180, 60)]),
     dict(name="Crossroads", level="Medium", seed=7,
-         path=[(-30, 240), (360, 240), (360, 80), (120, 80), (120, 400),
-               (400, 400), (400, 520)]),
+         paths=[[(-30, 240), (360, 240), (360, 80), (120, 80), (120, 400),
+                 (400, 400), (400, 520)]]),
+    dict(name="Spiral", level="Medium", seed=13,
+         paths=[[(-30, 40), (440, 40), (440, 440), (40, 440), (40, 140),
+                 (340, 140), (340, 340), (140, 340), (140, 240), (245, 240)]]),
     dict(name="Rapids", level="Hard", seed=11,
-         path=[(240, -30), (240, 160), (420, 160), (420, 330), (60, 330),
-               (60, 520)]),
+         paths=[[(240, -30), (240, 160), (420, 160), (420, 330), (60, 330),
+                 (60, 520)]]),
+    dict(name="Twin Lanes", level="Hard", seed=17,
+         paths=[[(60, -30), (60, 200), (180, 200), (180, 380), (240, 380), (240, 520)],
+                [(420, -30), (420, 200), (300, 200), (300, 380), (240, 380), (240, 520)]],
+         water=[(240, 90, 55)]),
+    dict(name="Canyon", level="Hard", seed=19,
+         paths=[[(-30, 420), (100, 420), (100, 300), (220, 300), (220, 180),
+                 (340, 180), (340, 60), (520, 60)]],
+         rocks=[(190, 420, 34), (310, 300, 36), (430, 190, 32), (60, 190, 42),
+                (200, 60, 36), (430, 420, 46), (320, 420, 28), (100, 60, 26)]),
 ]
 
 DIFFICULTIES = [
@@ -445,9 +549,10 @@ class Path:
 
 class Balloon:
     __slots__ = ("name", "info", "hp", "dist", "x", "y", "seg", "alive", "camo",
-                 "frozen", "slow", "id", "speed_now", "rank", "r")
+                 "frozen", "slow", "id", "speed_now", "rank", "r", "path",
+                 "glue", "glue_slow", "acid", "acid_t", "glue_by")
 
-    def __init__(self, name, dist, camo, bid, hp_mult):
+    def __init__(self, name, dist, camo, bid, hp_mult, path):
         self.name = name
         self.info = BALLOON_TYPES[name]
         self.hp = self.info["hp"] * (hp_mult if self.info["hp"] > 1 else 1)
@@ -462,6 +567,12 @@ class Balloon:
         self.speed_now = 0.0
         self.rank = BALLOON_ORDER.index(name)
         self.r = self.info["r"]
+        self.path = path
+        self.glue = 0.0          # seconds of glue left
+        self.glue_slow = 0.0
+        self.acid = 0.0          # acid glue: pops a layer every this many seconds
+        self.acid_t = 0.0
+        self.glue_by = None
 
 
 class Tower:
@@ -477,6 +588,8 @@ class Tower:
         self.pops = 0
         self.flash = 0.0
         self.cool2 = 0.0          # Dragon's Breath flamethrower
+        self.shots = 0            # Ninja: every 4th throw can be a stun bomb
+        self.spots = None         # Spike Factory: places on the track it can reach
         self.recalc()
 
     def recalc(self):
@@ -504,7 +617,8 @@ class Tower:
 
 class Proj:
     __slots__ = ("kind", "x", "y", "vx", "vy", "life", "dmg", "pierce", "dtype",
-                 "r", "hit", "tower", "blast", "cluster", "bm", "dead", "angle", "homing")
+                 "r", "hit", "tower", "blast", "cluster", "bm", "dead", "angle", "homing",
+                 "turn", "knock")
 
     def __init__(self, kind, x, y, angle, speed, life, dmg, pierce, dtype, r, tower):
         self.kind = kind
@@ -523,6 +637,8 @@ class Proj:
         self.bm = 1
         self.dead = False
         self.homing = False
+        self.turn = 0.0          # boomerangs curve (radians per second)
+        self.knock = 0           # push balloons back this far on hit
 
 
 # =====================================================================
@@ -627,6 +743,52 @@ def make_tower_sprite(key, font):
         pygame.draw.circle(s, (92, 112, 60), (c, c), r)
         pygame.draw.circle(s, (135, 155, 85), (c, c), r - 8)
         pygame.draw.circle(s, (40, 55, 25), (c, c), r, 2)
+    elif key == "boom":
+        pygame.draw.circle(s, (230, 150, 60), (c, c), r)
+        pygame.draw.circle(s, (130, 75, 25), (c, c), r, 2)
+        pygame.draw.lines(s, (90, 50, 20), False, [(c - 9, c - 7), (c + 1, c + 6), (c + 10, c - 6)], 5)
+    elif key == "glue":
+        pygame.draw.circle(s, (120, 175, 70), (c, c), r)
+        pygame.draw.circle(s, (60, 100, 30), (c, c), r, 2)
+        pygame.draw.circle(s, (200, 235, 90), (c - 3, c + 2), 7)
+        pygame.draw.circle(s, (200, 235, 90), (c + 5, c + 6), 4)
+    elif key == "ninja":
+        pygame.draw.circle(s, (45, 45, 60), (c, c), r)
+        pygame.draw.rect(s, (200, 40, 40), (c - r + 3, c - 5, 2 * r - 6, 7))
+        star = []
+        for i in range(8):
+            rad = 9 if i % 2 == 0 else 3
+            a = i * math.pi / 4
+            star.append((c + rad * math.cos(a), c + 7 + rad * math.sin(a) * 0.6))
+        pygame.draw.polygon(s, (210, 210, 220), star)
+        pygame.draw.circle(s, (20, 20, 28), (c, c), r, 2)
+    elif key == "spike":
+        rect = pygame.Rect(c - 13, c - 13, 26, 26)
+        for i in range(4):   # spikes poking out on every side
+            a = i * math.pi / 2
+            tip = (c + 19 * math.cos(a), c + 19 * math.sin(a))
+            side = (math.cos(a + math.pi / 2) * 6, math.sin(a + math.pi / 2) * 6)
+            base = (c + 12 * math.cos(a), c + 12 * math.sin(a))
+            pygame.draw.polygon(s, (190, 190, 200), [tip, (base[0] + side[0], base[1] + side[1]),
+                                                     (base[0] - side[0], base[1] - side[1])])
+        pygame.draw.rect(s, (110, 110, 120), rect, border_radius=4)
+        pygame.draw.rect(s, (60, 60, 70), rect, 2, border_radius=4)
+        pygame.draw.circle(s, (230, 160, 50), (c, c), 4)
+    elif key == "village":
+        pygame.draw.circle(s, (120, 170, 90), (c, c), r)
+        pygame.draw.circle(s, (60, 100, 40), (c, c), r, 2)
+        pygame.draw.rect(s, (175, 120, 70), (c - 9, c - 2, 18, 12))
+        pygame.draw.polygon(s, (200, 60, 50), [(c - 13, c - 1), (c + 13, c - 1), (c, c - 13)])
+        pygame.draw.rect(s, (80, 50, 25), (c - 3, c + 3, 6, 7))
+    elif key == "super":
+        pygame.draw.circle(s, (50, 90, 200), (c, c), r)
+        pygame.draw.circle(s, (20, 40, 110), (c, c), r, 2)
+        star = []
+        for i in range(10):
+            rad = 11 if i % 2 == 0 else 5
+            a = i * math.pi / 5 - math.pi / 2
+            star.append((c + rad * math.cos(a), c + rad * math.sin(a)))
+        pygame.draw.polygon(s, (255, 215, 60), star)
     elif key == "wizard":
         pygame.draw.circle(s, (110, 60, 170), (c, c), r)
         pygame.draw.circle(s, (55, 25, 95), (c, c), r, 2)
@@ -646,6 +808,8 @@ BARRELS = {   # (length, width, color) of the part that points at balloons
     "dart": (22, 5, (70, 45, 25)),
     "bomb": (19, 10, (30, 30, 34)),
     "sniper": (28, 4, (40, 50, 25)),
+    "glue": (18, 7, (60, 100, 30)),
+    "super": (20, 6, (230, 200, 60)),
 }
 
 
@@ -658,13 +822,15 @@ class Game:
         self.map_idx, self.diff_idx = map_idx, diff_idx
         self.mp = MAPS[map_idx]
         self.diff = DIFFICULTIES[diff_idx]
-        self.path = Path([(x, y + MAP_Y) for x, y in self.mp["path"]])
+        self.paths = [Path([(x, y + MAP_Y) for x, y in pts]) for pts in self.mp["paths"]]
+        self.blocked = [(x, y + MAP_Y, r) for x, y, r in self.mp.get("water", []) + self.mp.get("rocks", [])]
         self.reset()
 
     def reset(self):
         self.balloons = []
         self.towers = []
         self.projs = []
+        self.spikes = []            # spike piles: [x, y, pierce left, life, tower]
         self.fx = []                # visual effects
         self.money = START_MONEY
         self.lives = self.diff["lives"]
@@ -687,12 +853,54 @@ class Game:
         self.over_idx = 0
         self.won = False
         self.next_id = 1
+        self.spawned = 0            # used to take turns between tracks
         self.hp_mult = 1.0
         self.grid = {}
 
     # ---------------------------------------------------------- helpers
     def cost(self, base):
         return round_cost(base, self.diff["cost"])
+
+    def discount_at(self, x, y, skip=None):
+        """Villages with Trade Post make things cheaper inside their circle."""
+        best = 0.0
+        for v in self.towers:
+            if v.key == "village" and v is not skip and v.s["discount"]:
+                if (v.x - x) ** 2 + (v.y - y) ** 2 <= v.s["range"] ** 2:
+                    best = max(best, v.s["discount"])
+        return best
+
+    def place_cost(self, tt, x, y):
+        return self.cost(tt["cost"] * (1 - self.discount_at(x, y)))
+
+    def upgrade_cost(self, t, p):
+        return self.cost(t.t["paths"][p][t.levels[p]][1] * (1 - self.discount_at(t.x, t.y, t)))
+
+    def refresh_buffs(self):
+        """Recalculate every tower's stats, adding boosts from nearby villages."""
+        for t in self.towers:   # villages must be up to date before they boost others
+            t.recalc()
+        villages = [v for v in self.towers if v.key == "village"]
+        for t in self.towers:
+            if t.key in ("village", "mine"):
+                continue
+            boost, radar, drums, rune = 0.0, False, 0.0, False
+            for v in villages:
+                vs = v.s
+                if (v.x - t.x) ** 2 + (v.y - t.y) ** 2 <= vs["range"] ** 2:
+                    boost = max(boost, vs["boost"])
+                    radar = radar or vs["radar"]
+                    drums = max(drums, vs["drums"])
+                    rune = rune or vs["rune"]
+            ts = t.s
+            if boost and 0 < ts.get("range", 0) < 600:
+                ts["range"] = ts["range"] * (1 + boost)
+            if radar:
+                ts["camo"] = True
+            if drums and "rate" in ts:
+                ts["rate"] *= 1 - drums
+            if rune and ts.get("dtype") in ("sharp", "explode"):
+                ts["dtype"] = "normal"
 
     def toast(self, text, secs=1.6):
         self.toast_text, self.toast_t = text, secs
@@ -706,17 +914,24 @@ class Game:
     def can_place(self, x, y):
         if not (TOWER_R <= x <= SCREEN_W - TOWER_R and MAP_Y + TOWER_R <= y <= MAP_Y + MAP_H - TOWER_R):
             return False
-        if self.path.distance_to(x, y) < PATH_W / 2 + TOWER_R - 2:
-            return False
+        for path in self.paths:
+            if path.distance_to(x, y) < PATH_W / 2 + TOWER_R - 2:
+                return False
+        for bx, by, br in self.blocked:
+            if (bx - x) ** 2 + (by - y) ** 2 < (br + TOWER_R - 6) ** 2:
+                return False
         for t in self.towers:
             if (t.x - x) ** 2 + (t.y - y) ** 2 < (TOWER_R * 2) ** 2:
                 return False
         return True
 
-    def spawn_balloon(self, name, dist, camo, seg=0):
-        b = Balloon(name, max(0.0, dist), camo, self.next_id, self.hp_mult)
+    def spawn_balloon(self, name, dist, camo, seg=0, path=None):
+        if path is None:   # a new balloon: take turns between the tracks
+            path = self.paths[self.spawned % len(self.paths)]
+            self.spawned += 1
+        b = Balloon(name, max(0.0, dist), camo, self.next_id, self.hp_mult, path)
         self.next_id += 1
-        b.x, b.y, b.seg = self.path.pos(b.dist, seg)
+        b.x, b.y, b.seg = path.pos(b.dist, seg)
         self.balloons.append(b)
         return b
 
@@ -747,10 +962,10 @@ class Game:
         income = 0
         lives = 0
         for t in self.towers:
-            if t.key == "mine":
-                pay = int(t.s["income"] * t.s["mult"])
+            if t.s.get("income"):
+                pay = int(t.s["income"] * t.s.get("mult", 1))
                 income += pay
-                lives += t.s["lives"]
+                lives += t.s.get("lives", 0)
                 self.add_fx("text", t.x, t.y - 20, 1.2, "+$%d" % pay)
         self.money += bonus + income
         self.lives += lives
@@ -781,7 +996,7 @@ class Game:
         self.app.sounds.play("pop")
         kids = []
         for i, child in enumerate(b.info["children"]):
-            nb = self.spawn_balloon(child, b.dist - i * 9, b.camo, b.seg)
+            nb = self.spawn_balloon(child, b.dist - i * 9, b.camo, b.seg, b.path)
             kids.append(nb)
             if proj:
                 proj.hit.add(nb.id)
@@ -833,14 +1048,17 @@ class Game:
             rr = rng + b.r
             if d2 > rr * rr:
                 continue
+            left = b.path.total - b.dist   # distance still to go
             if mode == "First":
-                v = b.dist
+                v = -left
             elif mode == "Last":
-                v = -b.dist
+                v = left
             elif mode == "Strong":
-                v = b.rank * 100000 + b.dist
+                v = b.rank * 100000 - left
             else:
                 v = -d2
+            if t.key == "glue" and (b.glue > 0.5 or (b.info.get("blimp") and not s["glue_blimp"])):
+                v -= 1e9   # only if there's nothing better to glue
             if bestv is None or v > bestv:
                 best, bestv = b, v
         return best
@@ -849,9 +1067,9 @@ class Game:
         """Aim where the balloon will be when the shot arrives."""
         d = math.hypot(b.x - t.x, b.y - t.y)
         future = b.dist + b.speed_now * d / speed
-        if future >= self.path.total:
+        if future >= b.path.total:
             return b.x, b.y
-        x, y, _ = self.path.pos(future, b.seg)
+        x, y, _ = b.path.pos(future, b.seg)
         return x, y
 
     def frost_pulse(self, t):
@@ -896,20 +1114,49 @@ class Game:
         if t.key == "frost":
             t.cool = s["rate"] if self.frost_pulse(t) else 0.1
             return
+        if t.key == "village":
+            return
+        if t.key == "spike":
+            if self.active:   # spikes are only made during a round
+                t.cool = s["rate"]
+                self.make_spikes(t)
+            else:
+                t.cool = 0.0
+            return
         tgt = self.find_target(t)
         if tgt is None:
             t.cool = 0.05
             return
         t.cool = s["rate"]
         t.flash = 0.08
-        if t.key == "dart":
+        if t.key in ("dart", "ninja", "super", "glue"):
+            kind = {"dart": "dart", "ninja": "star", "super": "laser", "glue": "glue"}[t.key]
             ax, ay = self.lead(t, tgt, s["speed"])
             t.angle = math.atan2(ay - t.y, ax - t.x)
             n = s["count"]
             for i in range(n):
                 a = t.angle + s["spread"] * (i - (n - 1) / 2)
-                self.projs.append(Proj("dart", t.x + math.cos(a) * 16, t.y + math.sin(a) * 16, a, s["speed"],
-                                       (s["range"] + 40) / s["speed"], s["dmg"], s["pierce"], s["dtype"], 5, t))
+                pr = Proj(kind, t.x + math.cos(a) * 16, t.y + math.sin(a) * 16, a, s["speed"],
+                          (s["range"] + 40) / s["speed"], s.get("dmg", 0), s["pierce"], s.get("dtype"),
+                          7 if kind == "glue" else 5, t)
+                pr.homing = s.get("homing", False)
+                pr.bm = s.get("blimp_mult", 1)
+                self.projs.append(pr)
+            if s.get("stun"):
+                t.shots += 1
+                if t.shots % 4 == 0:
+                    self.stun_bomb(tgt.x, tgt.y, s["stun"])
+        elif t.key == "boom":
+            d = min(math.hypot(tgt.x - t.x, tgt.y - t.y), s["range"])
+            rc = max(30.0, d / 2 + 6)          # radius of the curved flight
+            t.angle = aim = math.atan2(tgt.y - t.y, tgt.x - t.x)
+            for k in range(s["count"]):
+                sign = 1 if k == 0 else -1     # 2nd boomerang curves the other way
+                pr = Proj("boom", t.x, t.y, aim - sign * math.pi / 2, s["speed"],
+                          2 * math.pi * rc / s["speed"], s["dmg"], s["pierce"], s["dtype"], 10, t)
+                pr.turn = sign * s["speed"] / rc
+                pr.knock = s["knock"]
+                self.projs.append(pr)
         elif t.key == "tack":
             n = s["count"]
             for i in range(n):
@@ -938,6 +1185,57 @@ class Game:
             self.add_fx("line", t.x, t.y, 0.08, (tgt.x, tgt.y))
             self.damage(tgt, dmg, s["dtype"], None, t)
 
+    def stun_bomb(self, x, y, secs):
+        for b in self.query(x, y, 70):
+            if b.alive and (b.x - x) ** 2 + (b.y - y) ** 2 <= (70 + b.r) ** 2:
+                b.frozen = max(b.frozen, secs)
+        self.add_fx("ring", x, y, 0.3, (70, WHITE))
+
+    def apply_glue(self, b, s, tower):
+        if b.info.get("blimp") and not s["glue_blimp"]:
+            return
+        b.glue = s["glue_time"]
+        b.glue_slow = s["slow"] * (0.5 if b.info.get("blimp") else 1)
+        b.acid = s["acid"]
+        b.acid_t = s["acid"]
+        b.glue_by = tower
+
+    def make_spikes(self, t):
+        if t.spots is None or t.spots[0] != t.s["range"]:
+            spots = []   # every reachable point on every track
+            for path in self.paths:
+                d = 0.0
+                while d < path.total:
+                    x, y, _ = path.pos(d)
+                    if MAP_Y < y < PANEL_Y and 0 < x < SCREEN_W and \
+                            (x - t.x) ** 2 + (y - t.y) ** 2 <= t.s["range"] ** 2:
+                        spots.append((x, y))
+                    d += 10
+            t.spots = (t.s["range"], spots)
+        spots = t.spots[1]
+        if not spots or sum(1 for sp in self.spikes if sp[4] is t) >= 30:
+            return
+        x, y = random.choice(spots)
+        self.spikes.append([x + random.uniform(-9, 9), y + random.uniform(-9, 9),
+                            t.s["pierce"], t.s["life"], t])
+
+    def update_spikes(self, dt):
+        for sp in self.spikes:
+            x, y, _, _, t = sp
+            if self.active:
+                sp[3] -= dt
+            for b in self.query(x, y, 10):
+                if sp[2] <= 0:
+                    break
+                if b.alive and (b.x - x) ** 2 + (b.y - y) ** 2 <= (b.r + 9) ** 2:
+                    self.damage(b, t.s["dmg"], t.s["dtype"], None, t)
+                    sp[2] -= 1
+            if (sp[2] <= 0 or sp[3] <= 0) and t.s["mines"]:
+                boom = Proj("bomb", x, y, 0, 0, 0, 2, 20, "explode", 0, t)
+                boom.blast = 50
+                self.explode(boom)
+        self.spikes = [sp for sp in self.spikes if sp[2] > 0 and sp[3] > 0]
+
     def lightning(self, t, first, jumps, dmg):
         """Lightning hits one balloon, then jumps to the nearest new one."""
         hit = set()
@@ -963,7 +1261,7 @@ class Game:
         for b in self.query(p.x, p.y, p.blast):
             if b.alive and (b.x - p.x) ** 2 + (b.y - p.y) ** 2 <= (p.blast + b.r) ** 2:
                 hits.append(b)
-        hits.sort(key=lambda b: -b.dist)
+        hits.sort(key=lambda b: b.dist - b.path.total)
         for b in hits[:p.pierce]:
             self.damage(b, p.dmg * (p.bm if b.info.get("blimp") else 1), p.dtype, None, p.tower)
         self.add_fx("ring", p.x, p.y, 0.25, (p.blast, (255, 170, 50)))
@@ -984,7 +1282,7 @@ class Game:
                 self.spawn_balloon(name, 0.0, camo)
 
         base = BALLOON_SPEED * self.diff["speed"]
-        total = self.path.total
+        acid_hits = []
         for b in self.balloons:
             if not b.alive:
                 continue
@@ -995,18 +1293,30 @@ class Game:
             elif b.slow > 0:
                 b.slow -= dt
                 sp *= 0.5
+            if b.glue > 0:
+                b.glue -= dt
+                sp *= 1 - b.glue_slow
+                if b.acid:
+                    b.acid_t -= dt
+                    if b.acid_t <= 0:
+                        b.acid_t = b.acid
+                        acid_hits.append(b)
             b.speed_now = sp
             b.dist += sp * dt
-            if b.dist >= total:
+            if b.dist >= b.path.total:
                 b.alive = False
                 self.lives -= self.rbe_left(b)
                 self.app.sounds.play("leak")
             else:
-                b.x, b.y, b.seg = self.path.pos(b.dist, b.seg)
+                b.x, b.y, b.seg = b.path.pos(b.dist, b.seg)
+
+        for b in acid_hits:
+            self.damage(b, 1, "normal", None, b.glue_by)
 
         self.build_grid()
         for t in self.towers:
             self.update_tower(t, dt)
+        self.update_spikes(dt)
 
         for p in self.projs:
             if p.dead:
@@ -1023,6 +1333,10 @@ class Game:
                     a = math.atan2(near.y - p.y, near.x - p.x)
                     p.vx, p.vy = math.cos(a) * sp, math.sin(a) * sp
                     p.life = max(p.life, 0.3)
+            if p.turn:
+                c, sn = math.cos(p.turn * dt), math.sin(p.turn * dt)
+                p.vx, p.vy = p.vx * c - p.vy * sn, p.vx * sn + p.vy * c
+                p.angle += 12 * dt
             p.x += p.vx * dt
             p.y += p.vy * dt
             p.life -= dt
@@ -1041,6 +1355,23 @@ class Game:
                         self.explode(p)
                         break
                     p.hit.add(b.id)
+                    if p.kind == "glue":
+                        ts = p.tower.s
+                        if ts["splash"]:
+                            for c in self.query(p.x, p.y, ts["splash"]):
+                                if c.alive and (c.x - p.x) ** 2 + (c.y - p.y) ** 2 <= (ts["splash"] + c.r) ** 2:
+                                    self.apply_glue(c, ts, p.tower)
+                            self.add_fx("ring", p.x, p.y, 0.25, (ts["splash"], (170, 220, 60)))
+                            p.dead = True
+                            break
+                        self.apply_glue(b, ts, p.tower)
+                        p.pierce -= 1
+                        if p.pierce <= 0:
+                            p.dead = True
+                            break
+                        continue
+                    if p.knock and not b.info.get("blimp"):
+                        b.dist = max(0.0, b.dist - p.knock)
                     self.damage(b, p.dmg * (p.bm if b.info.get("blimp") else 1), p.dtype, p, p.tower)
                     p.pierce -= 1
                     if p.pierce <= 0:
@@ -1139,7 +1470,7 @@ class Game:
             self.mode = "normal"
         if "A" in inp.pressed:
             tt = TOWER_TYPES[self.shop]
-            cost = self.cost(tt["cost"])
+            cost = self.place_cost(tt, self.cx, self.cy)
             existing = self.tower_at(self.cx, self.cy)
             if existing:
                 self.open_menu(existing)
@@ -1152,6 +1483,7 @@ class Game:
             else:
                 self.money -= cost
                 self.towers.append(Tower(tt, self.cx, self.cy, cost))
+                self.refresh_buffs()
                 self.app.sounds.play("place")
                 self.mode = "normal"
 
@@ -1173,7 +1505,7 @@ class Game:
             i = self.towers.index(t) + (1 if "R" in inp.pressed else -1)
             self.sel = t = self.towers[i % len(self.towers)]
             self.cx, self.cy = t.x, t.y
-        if self.menu == 2 and t.key not in ("mine", "frost"):
+        if self.menu == 2 and t.key not in NO_TARGETING:
             if "LEFT" in inp.repeat:
                 t.target_mode = (t.target_mode - 1) % len(TARGET_MODES)
             if "RIGHT" in inp.repeat or "A" in inp.pressed:
@@ -1188,7 +1520,7 @@ class Game:
             elif state == "locked":
                 self.toast("Only one path can reach level 3")
             else:
-                cost = self.cost(t.t["paths"][p][t.levels[p]][1])
+                cost = self.upgrade_cost(t, p)
                 if self.money < cost:
                     self.toast("Need $%d more" % (cost - self.money))
                     self.app.sounds.play("error")
@@ -1196,13 +1528,15 @@ class Game:
                     self.money -= cost
                     t.spent += cost
                     t.levels[p] += 1
-                    t.recalc()
+                    self.refresh_buffs()
                     self.app.sounds.play("upgrade")
                     self.add_fx("ring", t.x, t.y, 0.3, (TOWER_R + 10, YELLOW))
         elif self.menu == 3:
             value = int(t.spent * SELL_RATE)
             self.money += value
             self.towers.remove(t)
+            self.spikes = [sp for sp in self.spikes if sp[4] is not t]
+            self.refresh_buffs()
             self.add_fx("text", t.x, t.y, 1.0, "+$%d" % value)
             self.mode = "normal"
 
@@ -1242,12 +1576,19 @@ class Game:
         app = self.app
         surf.blit(app.map_bg(self.map_idx), (0, MAP_Y))
 
+        for x, y, _, _, t in self.spikes:
+            col = (255, 150, 60) if t.s["dtype"] == "normal" else (205, 205, 215)
+            for dx, dy in ((-5, 2), (4, 3), (0, -4)):
+                px, py = int(x + dx), int(y + dy)
+                pygame.draw.polygon(surf, col, [(px, py - 5), (px - 4, py + 3), (px + 4, py + 3)])
+                pygame.draw.polygon(surf, (70, 70, 80), [(px, py - 5), (px - 4, py + 3), (px + 4, py + 3)], 1)
+
         for t in self.towers:
             self.draw_tower(surf, t)
 
         for b in self.balloons:
             if b.info.get("blimp"):
-                ux, uy = self.path.segs[b.seg][2:4]
+                ux, uy = b.path.segs[b.seg][2:4]
                 d = ("R" if ux > 0 else "L") if abs(ux) > abs(uy) else ("D" if uy > 0 else "U")
                 spr, ox, oy = app.blimp_sprites[b.name][d]
                 surf.blit(spr, (b.x - ox, b.y - oy))
@@ -1263,12 +1604,37 @@ class Game:
                 surf.blit(spr, (b.x - ox, b.y - oy))
                 if b.frozen > 0:
                     surf.blit(app.ice_sprite(b.r), (b.x - b.r - 3, b.y - b.r - 3))
+            if b.glue > 0:
+                gx, gy = int(b.x), int(b.y - b.r * 0.4)
+                col = (150, 230, 60) if not b.acid else (210, 250, 40)
+                pygame.draw.circle(surf, col, (gx, gy), max(5, b.r // 2))
+                pygame.draw.circle(surf, col, (gx + 4, gy + b.r // 2 + 2), 3)
 
         for p in self.projs:
             if p.kind == "dart":
                 ex, ey = math.cos(p.angle) * 9, math.sin(p.angle) * 9
                 pygame.draw.line(surf, (60, 40, 20), (p.x - ex, p.y - ey), (p.x + ex, p.y + ey), 4)
                 pygame.draw.circle(surf, (230, 230, 230), (int(p.x + ex), int(p.y + ey)), 2)
+            elif p.kind == "star":
+                pts = []
+                for i in range(8):
+                    rad = 8 if i % 2 == 0 else 3
+                    a = p.angle * 3 + i * math.pi / 4 + p.life * 20
+                    pts.append((p.x + rad * math.cos(a), p.y + rad * math.sin(a)))
+                pygame.draw.polygon(surf, (215, 215, 225), pts)
+                pygame.draw.polygon(surf, (60, 60, 70), pts, 1)
+            elif p.kind == "laser":
+                ex, ey = math.cos(p.angle) * 10, math.sin(p.angle) * 10
+                col = (255, 90, 90) if p.dtype == "normal" else (120, 210, 255)
+                pygame.draw.line(surf, col, (p.x - ex, p.y - ey), (p.x + ex, p.y + ey), 4)
+            elif p.kind == "glue":
+                pygame.draw.circle(surf, (150, 230, 60), (int(p.x), int(p.y)), 6)
+                pygame.draw.circle(surf, (70, 120, 30), (int(p.x), int(p.y)), 6, 1)
+            elif p.kind == "boom":
+                ex, ey = math.cos(p.angle) * 9, math.sin(p.angle) * 9
+                fx, fy = math.cos(p.angle + 1.8) * 9, math.sin(p.angle + 1.8) * 9
+                col = (255, 120, 40) if p.dtype == "normal" else (220, 150, 60)
+                pygame.draw.lines(surf, col, False, [(p.x + ex, p.y + ey), (p.x, p.y), (p.x + fx, p.y + fy)], 5)
             elif p.kind == "bolt":
                 pygame.draw.circle(surf, (190, 120, 255), (int(p.x), int(p.y)), 7)
                 pygame.draw.circle(surf, (245, 225, 255), (int(p.x), int(p.y)), 3)
@@ -1290,7 +1656,7 @@ class Game:
             self.draw_range(surf, self.sel.x, self.sel.y, self.sel.s["range"], True)
         elif self.mode == "place":
             tt = TOWER_TYPES[self.shop]
-            ok = self.can_place(self.cx, self.cy) and self.money >= self.cost(tt["cost"])
+            ok = self.can_place(self.cx, self.cy) and self.money >= self.place_cost(tt, self.cx, self.cy)
             self.draw_range(surf, self.cx, self.cy, tt["base"]["range"], ok)
             surf.blit(app.ghost_sprites[tt["key"]], (self.cx - 22, self.cy - 22))
         else:
@@ -1395,9 +1761,12 @@ class Game:
 
     def draw_shop_strip(self, surf, highlight):
         app = self.app
-        slot_w = SCREEN_W // len(TOWER_TYPES)
-        for i, tt in enumerate(TOWER_TYPES):
-            x = i * slot_w
+        shown = min(SHOP_SLOTS, len(TOWER_TYPES))
+        slot_w = SCREEN_W // shown
+        first = max(0, min(self.shop - shown // 2, len(TOWER_TYPES) - shown))
+        for i in range(first, first + shown):
+            tt = TOWER_TYPES[i]
+            x = (i - first) * slot_w
             cost = self.cost(tt["cost"])
             if highlight and i == self.shop:
                 pygame.draw.rect(surf, PANEL_HI, (x + 2, PANEL_Y + 3, slot_w - 4, 62), border_radius=6)
@@ -1406,6 +1775,11 @@ class Game:
             surf.blit(spr, (x + slot_w // 2 - 22, PANEL_Y + 2))
             img = app.text(app.f_small, "$%d" % cost, GREEN if self.money >= cost else (230, 110, 110))
             surf.blit(img, img.get_rect(center=(x + slot_w // 2, PANEL_Y + 54)))
+        for side, show in ((-1, first > 0), (1, first + shown < len(TOWER_TYPES))):
+            if show:   # little arrows: more towers this way
+                ax = 5 if side < 0 else SCREEN_W - 5
+                pygame.draw.polygon(surf, YELLOW, [(ax, PANEL_Y + 28), (ax - side * 7, PANEL_Y + 20),
+                                                   (ax - side * 7, PANEL_Y + 36)])
 
     def draw_panel(self, surf):
         app = self.app
@@ -1414,7 +1788,11 @@ class Game:
         if self.mode == "place":
             self.draw_shop_strip(surf, True)
             tt = TOWER_TYPES[self.shop]
-            surf.blit(app.text(app.f_norm, tt["name"], WHITE), (10, PANEL_Y + 68))
+            name = tt["name"]
+            disc = self.discount_at(self.cx, self.cy)
+            if disc:
+                name += "  $%d!" % self.place_cost(tt, self.cx, self.cy)
+            surf.blit(app.text(app.f_norm, name, YELLOW if disc else WHITE), (10, PANEL_Y + 68))
             hint = app.text(app.f_small, "A: build  B: back", GRAY)
             surf.blit(hint, (SCREEN_W - hint.get_width() - 10, PANEL_Y + 72))
             surf.blit(app.text(app.f_small, tt["desc"], (200, 205, 220)), (10, PANEL_Y + 95))
@@ -1449,10 +1827,16 @@ class Game:
             elif state == "locked":
                 rows.append(("Path %s: locked" % "AB"[p], GRAY, "Only one path can reach level 3"))
             else:
-                name, cost, desc, _ = t.t["paths"][p][t.levels[p]]
-                cost = self.cost(cost)
+                name, _, desc, _ = t.t["paths"][p][t.levels[p]]
+                cost = self.upgrade_cost(t, p)
                 rows.append(("%s  $%d" % (name, cost), GREEN if self.money >= cost else (230, 110, 110), desc))
-        if t.key == "mine":
+        if t.key == "spike":
+            rows.append(("Piles pop %d each" % t.s["pierce"], WHITE, "Spikes land on the track in range"))
+        elif t.key == "village":
+            perks = [n for n, on in (("range", True), ("camo", t.s["radar"]), ("speed", t.s["drums"]),
+                                     ("lead", t.s["rune"]), ("discount", t.s["discount"])) if on]
+            rows.append(("Boosts: " + ", ".join(perks), WHITE, "Helps every tower in its circle"))
+        elif t.key == "mine":
             pay = int(t.s["income"] * t.s["mult"])
             extra = " +%d lives" % t.s["lives"] if t.s["lives"] else ""
             rows.append(("Earns $%d/round%s" % (pay, extra), WHITE, "Paid at the end of every round"))
@@ -1564,17 +1948,35 @@ class App:
         for _ in range(30):
             x, y = rnd.randrange(SCREEN_W), rnd.randrange(MAP_H)
             pygame.draw.circle(surf, rnd.choice([(250, 250, 250), (250, 220, 80), (240, 140, 180)]), (x, y), 3)
-        pts = mp["path"]
+        for x, y, r in mp.get("water", []):
+            pygame.draw.circle(surf, (60, 120, 200), (x, y), r + 5)
+        for x, y, r in mp.get("water", []):
+            pygame.draw.circle(surf, (80, 150, 230), (x, y), r)
+        for x, y, r in mp.get("water", []):   # little waves
+            for i in range(3):
+                wx, wy = x - r // 3 + i * 14 - 10, y - r // 3 + i * 16
+                pygame.draw.arc(surf, (170, 210, 250), (wx, wy, 18, 10), 0.3, 2.8, 2)
         for col, half in ((PATH_EDGE, PATH_W // 2 + 4), (PATH_COL, PATH_W // 2)):
-            for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
-                surf.fill(col, pygame.Rect(min(x0, x1) - half, min(y0, y1) - half,
-                                           abs(x1 - x0) + 2 * half, abs(y1 - y0) + 2 * half))
-        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):   # little pebbles on the track
-            for _ in range(int(math.hypot(x1 - x0, y1 - y0) / 25)):
-                t = rnd.random()
-                px = x0 + (x1 - x0) * t + rnd.randint(-12, 12)
-                py = y0 + (y1 - y0) * t + rnd.randint(-12, 12)
-                pygame.draw.circle(surf, (190, 160, 110), (int(px), int(py)), 2)
+            for pts in mp["paths"]:
+                for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+                    surf.fill(col, pygame.Rect(min(x0, x1) - half, min(y0, y1) - half,
+                                               abs(x1 - x0) + 2 * half, abs(y1 - y0) + 2 * half))
+        for pts in mp["paths"]:
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:]):   # little pebbles on the track
+                for _ in range(int(math.hypot(x1 - x0, y1 - y0) / 25)):
+                    t = rnd.random()
+                    px = x0 + (x1 - x0) * t + rnd.randint(-12, 12)
+                    py = y0 + (y1 - y0) * t + rnd.randint(-12, 12)
+                    pygame.draw.circle(surf, (190, 160, 110), (int(px), int(py)), 2)
+            ex, ey = pts[-1]
+            if 0 <= ex <= SCREEN_W and 0 <= ey <= MAP_H:   # track ends in a hole
+                pygame.draw.circle(surf, (60, 45, 30), (ex, ey), PATH_W // 2 + 2)
+                pygame.draw.circle(surf, (15, 10, 5), (ex, ey), PATH_W // 2 - 4)
+        for x, y, r in mp.get("rocks", []):
+            pygame.draw.circle(surf, (95, 90, 85), (x, y + 3), r)
+            pygame.draw.circle(surf, (135, 128, 120), (x, y), r)
+            pygame.draw.circle(surf, (165, 158, 150), (x - r // 3, y - r // 3), r // 3)
+            pygame.draw.circle(surf, (85, 80, 75), (x, y), r, 2)
         return surf
 
     def range_sprite(self, r, ok):
@@ -1712,8 +2114,8 @@ class App:
         ("TIPS", YELLOW),
         ("Lead balloons need bombs, fire or magic.", WHITE),
         ("Black ones ignore bombs.", WHITE),
-        ("Camo balloons need Eagle Eye,", WHITE),
-        ("Night Scope, Radar or Cold Snap.", WHITE),
+        ("Ninjas see camo. Some upgrades do too.", WHITE),
+        ("Villages boost towers in their circle.", WHITE),
         ("Only one upgrade path can reach 3.", WHITE),
     ]
 

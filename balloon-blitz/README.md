@@ -30,14 +30,33 @@ round 1 yourself, so you have time to build.
 |---|---|---|
 | Dart Tower | $200 | Throws darts at one balloon |
 | Tack Shooter | $280 | Fires tacks in every direction |
+| Boomerang | $325 | Curved throw that comes back, pops a lot |
 | Bomb Tower | $500 | Explosions pop groups and lead (not black) |
+| Glue Gunner | $275 | Slows balloons; acid glue pops them |
 | Frost Tower | $350 | Freezes balloons around it |
+| Ninja | $400 | Fast throwing stars, sees camo |
 | Sniper | $350 | Hits anything anywhere on the map |
 | Wizard | $400 | Magic pops every balloon type; Lightning Bolt and Dragon's Breath upgrades |
+| Spike Factory | $650 | Drops spike piles on the track (only during rounds) |
+| Village | $900 | Boosts towers in its circle: range, camo, speed, discounts, money |
+| Super Tower | $2200 | A storm of darts |
 | Coin Mine | $600 | Earns money every round |
 
+The shop bar shows 7 towers at a time; press L / R to scroll through all 13.
 Every tower has **two upgrade paths with 3 levels each**. Only one path can
 reach level 3 (like in BTD6).
+
+### Maps
+
+| Map | Difficulty | What's special |
+|---|---|---|
+| Meadow | Easy | Long winding track |
+| Lake Loop | Easy | A lake in the middle you can't build on |
+| Crossroads | Medium | The track crosses itself |
+| Spiral | Medium | Spirals into a hole in the middle |
+| Rapids | Hard | Short track |
+| Twin Lanes | Hard | Two tracks, balloons take turns |
+| Canyon | Hard | Staircase track, rocks block good spots |
 
 ### Balloons to watch out for
 
@@ -46,7 +65,8 @@ reach level 3 (like in BTD6).
 - **White**: can't be frozen.
 - **Zebra**: ignores both explosions and freezing.
 - **Camo** (green spots): only towers with camo vision can target them
-  (Eagle Eye, Night Scope, Radar Reload, Wizard Sight, Cold Snap).
+  (Ninja, Eagle Eye, Night Scope, Radar Reload, Wizard Sight, Cold Snap,
+  Night Goggles, or any tower inside a Village with Radar Hut).
 - **Ceramic**: takes 10 hits.
 - **Blimp** (round 25) and **Titan** (round 30): giant bosses with health bars.
 
