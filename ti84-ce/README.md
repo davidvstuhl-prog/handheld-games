@@ -24,7 +24,13 @@ graphing calculator, written in C.
 In a tower's menu: choose an upgrade with the arrows and press `[2nd]` to buy it.
 On the *Target* row, left/right changes which balloon it shoots first.
 
-## 1. Build it (make the `.8xp` file)
+## 1. Get the `.8xp` file
+
+**Easiest:** GitHub builds it for you automatically every time the code
+changes. Download `BBLITZ.8xp` from the
+[**TI-84 CE build** release](../../../releases/tag/ti84-ce-latest).
+
+### Or build it yourself
 
 You need the free **CE C Toolchain**:
 <https://github.com/CE-Programming/toolchain/releases>

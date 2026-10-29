@@ -1,0 +1,55 @@
+# Builds Balloon Blitz CE (the TI-84 Plus CE version) into BBLITZ.8xp.
+# Runs whenever the calculator code changes, or by hand from the Actions tab.
+# The finished file is attached to the "TI-84 CE build" release and also
+# saved as a workflow artifact.
+name: Build TI-84 CE game
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ti84-ce/**"
+      - ".github/workflows/build-ti84.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to update the download release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Download the CE C toolchain
+        run: |
+          curl -sSfL -o CEdev.tar.gz \
+            https://github.com/CE-Programming/toolchain/releases/latest/download/CEdev-Linux.tar.gz
+          tar xzf CEdev.tar.gz -C "$HOME"
+          echo "$HOME/CEdev/bin" >> "$GITHUB_PATH"
+
+      - name: Build BBLITZ.8xp
+        working-directory: ti84-ce
+        run: |
+          make
+          ls -l bin/BBLITZ.8xp
+
+      - name: Save the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: BBLITZ-8xp
+          path: ti84-ce/bin/BBLITZ.8xp
+
+      - name: Put it on the download page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=ti84-ce-latest
+          NOTES="Latest build of Balloon Blitz CE for the TI-84 Plus CE (from commit ${GITHUB_SHA::7}). Send BBLITZ.8xp to your calculator with TI Connect CE. You also need the CE C libraries (clibs.8xg) from https://github.com/CE-Programming/libraries/releases"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --notes "$NOTES"
+          else
+            gh release create "$TAG" --title "TI-84 CE build" --notes "$NOTES" --target "$GITHUB_SHA"
+          fi
+          gh release upload "$TAG" ti84-ce/bin/BBLITZ.8xp --clobber
