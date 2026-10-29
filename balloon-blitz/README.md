@@ -28,15 +28,15 @@ round 1 yourself, so you have time to build.
 
 | Tower | Cost | What it does |
 |---|---|---|
-| Dart Tower | $200 | Throws darts at one balloon |
-| Tack Shooter | $280 | Fires tacks in every direction |
-| Boomerang | $325 | Curved throw that comes back, pops a lot |
+| Dart Tower | $170 | Throws darts at one balloon |
+| Tack Shooter | $280 | Fires 12 tacks in every direction |
+| Boomerang | $325 | Curved throw that comes back, pops a lot (set Left/Right curve in its menu) |
 | Bomb Tower | $500 | Explosions pop groups and lead (not black) |
-| Glue Gunner | $275 | Slows balloons; acid glue pops them |
+| Glue Gunner | $200 | Slows balloons; acid glue pops them |
 | Frost Tower | $350 | Freezes balloons around it |
 | Ninja | $400 | Fast throwing stars, sees camo |
 | Sniper | $350 | Hits anything anywhere on the map |
-| Wizard | $400 | Magic pops every balloon type; Lightning Bolt and Dragon's Breath upgrades |
+| Wizard | $320 | Magic pops every balloon type; Lightning Bolt and Dragon's Breath upgrades |
 | Spike Factory | $650 | Drops spike piles on the track (only during rounds) |
 | Village | $900 | Boosts towers in its circle: range, camo, speed, discounts, money |
 | Super Tower | $2200 | A storm of darts |
@@ -55,7 +55,7 @@ reach level 3 (like in BTD6).
 | Crossroads | Medium | The track crosses itself |
 | Spiral | Medium | Spirals into a hole in the middle |
 | Rapids | Hard | Short track |
-| Twin Lanes | Hard | Two tracks, balloons take turns |
+| Twin Lanes | Hard | Two tracks, balloons take turns (+$300 to start, 30% bigger round bonus) |
 | Canyon | Hard | Staircase track, rocks block good spots |
 
 ### Balloons to watch out for

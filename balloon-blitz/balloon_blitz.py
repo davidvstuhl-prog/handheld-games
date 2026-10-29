@@ -125,24 +125,24 @@ for _n in BALLOON_TYPES:
 # tower's stats: ("+", n) adds, ("*", n) multiplies, ("=", v) sets.
 # Upgrade rule: each path goes up to 3, but only ONE path can reach 3.
 TOWER_TYPES = [
-    dict(key="dart", name="Dart Tower", cost=200,
+    dict(key="dart", name="Dart Tower", cost=170,
          desc="Throws darts at one balloon",
          base=dict(range=130, rate=0.8, dmg=1, pierce=2, speed=540,
                    dtype="sharp", count=1, spread=0.0),
          paths=[
-             [("Sharp Darts", 140, "Darts pop 1 more balloon", {"pierce": ("+", 1)}),
-              ("Razor Darts", 220, "Darts pop 2 more balloons", {"pierce": ("+", 2)}),
-              ("Triple Shot", 400, "Throws 3 darts at once",
+             [("Sharp Darts", 120, "Darts pop 1 more balloon", {"pierce": ("+", 1)}),
+              ("Razor Darts", 185, "Darts pop 2 more balloons", {"pierce": ("+", 2)}),
+              ("Triple Shot", 340, "Throws 3 darts at once",
                {"count": ("=", 3), "spread": ("=", 0.22)})],
-             [("Long Range", 90, "+30 range", {"range": ("+", 30)}),
-              ("Eagle Eye", 160, "Can see camo balloons",
+             [("Long Range", 75, "+30 range", {"range": ("+", 30)}),
+              ("Eagle Eye", 135, "Can see camo balloons",
                {"camo": ("=", True), "range": ("+", 15)}),
-              ("Rapid Fire", 500, "Throws twice as fast", {"rate": ("*", 0.5)})],
+              ("Rapid Fire", 425, "Throws twice as fast", {"rate": ("*", 0.5)})],
          ]),
     dict(key="tack", name="Tack Shooter", cost=280,
          desc="Fires tacks in every direction",
-         base=dict(range=95, rate=1.05, dmg=1, pierce=1, speed=380,
-                   dtype="sharp", count=8),
+         base=dict(range=95, rate=0.9, dmg=1, pierce=1, speed=380,
+                   dtype="sharp", count=12),
          paths=[
              [("Quick Spin", 150, "Shoots 20% faster", {"rate": ("*", 0.8)}),
               ("Faster Spin", 260, "Shoots 25% faster", {"rate": ("*", 0.75)}),
@@ -181,19 +181,19 @@ TOWER_TYPES = [
                {"rate": ("*", 0.75), "camo": ("=", True)}),
               ("Cluster Bombs", 900, "Blasts throw 6 mini bombs", {"cluster": ("=", 6)})],
          ]),
-    dict(key="glue", name="Glue Gunner", cost=275,
+    dict(key="glue", name="Glue Gunner", cost=200,
          desc="Glue slows balloons down",
          base=dict(range=115, rate=1.0, pierce=1, speed=380, slow=0.5, glue_time=11,
                    acid=0, splash=0, glue_blimp=False, count=1, spread=0.0),
          paths=[
-             [("Sticky Glue", 200, "Slows more, lasts longer",
+             [("Sticky Glue", 150, "Slows more, lasts longer",
                {"slow": ("=", 0.65), "glue_time": ("+", 4)}),
-              ("Acid Glue", 450, "Glue pops a layer every 1.5s", {"acid": ("=", 1.5)}),
-              ("Melting Goo", 2200, "Fast acid, works on blimps",
+              ("Acid Glue", 340, "Glue pops a layer every 1.5s", {"acid": ("=", 1.5)}),
+              ("Melting Goo", 1650, "Fast acid, works on blimps",
                {"acid": ("=", 0.4), "glue_blimp": ("=", True)})],
-             [("Glue Spray", 220, "Glue hits 2 more balloons", {"pierce": ("+", 2)}),
-              ("Fast Squirt", 400, "Shoots 40% faster", {"rate": ("*", 0.6)}),
-              ("Glue Storm", 1600, "Glue splashes a whole area",
+             [("Glue Spray", 165, "Glue hits 2 more balloons", {"pierce": ("+", 2)}),
+              ("Fast Squirt", 300, "Shoots 40% faster", {"rate": ("*", 0.6)}),
+              ("Glue Storm", 1200, "Glue splashes a whole area",
                {"splash": ("=", 60), "glue_blimp": ("=", True)})],
          ]),
     dict(key="frost", name="Frost Tower", cost=350,
@@ -237,19 +237,19 @@ TOWER_TYPES = [
               ("Fast Bolt", 400, "Shoots 40% faster", {"rate": ("*", 0.6)}),
               ("Semi-Auto", 2800, "Shoots 3x faster", {"rate": ("*", 0.33)})],
          ]),
-    dict(key="wizard", name="Wizard", cost=400,
+    dict(key="wizard", name="Wizard", cost=320,
          desc="Magic pops every balloon type",
          base=dict(range=120, rate=1.1, dmg=1, pierce=3, speed=330,
                    dtype="normal", homing=False, chain=0, breath=False),
          paths=[
-             [("Arcane Blast", 300, "Magic does 1 more damage", {"dmg": ("+", 1)}),
-              ("Arcane Mastery", 700, "Casts faster, pops 2 more",
+             [("Arcane Blast", 240, "Magic does 1 more damage", {"dmg": ("+", 1)}),
+              ("Arcane Mastery", 560, "Casts faster, pops 2 more",
                {"rate": ("*", 0.6), "pierce": ("+", 2)}),
-              ("Lightning Bolt", 1600, "Lightning jumps to 8 balloons", {"chain": ("=", 8)})],
-             [("Guided Magic", 250, "Magic bolts chase balloons", {"homing": ("=", True)}),
-              ("Wizard Sight", 300, "Sees camo, +20 range",
+              ("Lightning Bolt", 1280, "Lightning jumps to 8 balloons", {"chain": ("=", 8)})],
+             [("Guided Magic", 200, "Magic bolts chase balloons", {"homing": ("=", True)}),
+              ("Wizard Sight", 240, "Sees camo, +20 range",
                {"camo": ("=", True), "range": ("+", 20)}),
-              ("Dragon's Breath", 1300, "Adds a flamethrower", {"breath": ("=", True)})],
+              ("Dragon's Breath", 1040, "Adds a flamethrower", {"breath": ("=", True)})],
          ]),
     dict(key="spike", name="Spike Factory", cost=650,
          desc="Drops spikes on the track",
@@ -329,9 +329,11 @@ MAPS = [
     dict(name="Rapids", level="Hard", seed=11,
          paths=[[(240, -30), (240, 160), (420, 160), (420, 330), (60, 330),
                  (60, 520)]]),
-    dict(name="Twin Lanes", level="Hard", seed=17,
-         paths=[[(60, -30), (60, 200), (180, 200), (180, 380), (240, 380), (240, 520)],
-                [(420, -30), (420, 200), (300, 200), (300, 380), (240, 380), (240, 520)]],
+    dict(name="Twin Lanes", level="Hard", seed=17, extra_money=300, bonus_mult=1.3,
+         paths=[[(60, -30), (60, 200), (180, 200), (180, 380), (240, 380), (240, 450),
+                 (420, 450), (420, 520)],
+                [(420, -30), (420, 200), (300, 200), (300, 380), (240, 380), (240, 450),
+                 (420, 450), (420, 520)]],
          water=[(240, 90, 55)]),
     dict(name="Canyon", level="Hard", seed=19,
          paths=[[(-30, 420), (100, 420), (100, 300), (220, 300), (220, 180),
@@ -589,6 +591,7 @@ class Tower:
         self.pops = 0
         self.flash = 0.0
         self.cool2 = 0.0          # Dragon's Breath flamethrower
+        self.curve = 1            # Boomerang: 1 = curves right, -1 = curves left
         self.shots = 0            # Ninja: every 4th throw can be a stun bomb
         self.spots = None         # Spike Factory: places on the track it can reach
         self.recalc()
@@ -833,7 +836,7 @@ class Game:
         self.projs = []
         self.spikes = []            # spike piles: [x, y, pierce left, life, tower]
         self.fx = []                # visual effects
-        self.money = START_MONEY
+        self.money = START_MONEY + self.mp.get("extra_money", 0)   # two-lane maps pay more
         self.lives = self.diff["lives"]
         self.round = 0              # the round being played / last played
         self.active = False         # is a round running?
@@ -959,7 +962,7 @@ class Game:
 
     def end_round(self):
         self.active = False
-        bonus = 120 + 3 * self.round
+        bonus = int((120 + 3 * self.round) * self.mp.get("bonus_mult", 1))
         income = 0
         lives = 0
         for t in self.towers:
@@ -1152,7 +1155,7 @@ class Game:
             rc = max(30.0, d / 2 + 6)          # radius of the curved flight
             t.angle = aim = math.atan2(tgt.y - t.y, tgt.x - t.x)
             for k in range(s["count"]):
-                sign = 1 if k == 0 else -1     # 2nd boomerang curves the other way
+                sign = t.curve if k == 0 else -t.curve   # 2nd boomerang curves the other way
                 pr = Proj("boom", t.x, t.y, aim - sign * math.pi / 2, s["speed"],
                           2 * math.pi * rc / s["speed"], s["dmg"], s["pierce"], s["dtype"], 10, t)
                 pr.turn = sign * s["speed"] / rc
@@ -1493,12 +1496,20 @@ class Game:
         self.mode = "menu"
         self.menu = 0
 
+    def menu_rows(self, t):
+        """What's in a tower's menu, top to bottom."""
+        rows = ["upgrade0", "upgrade1", "target"]
+        if t.key == "boom":
+            rows.append("curve")
+        return rows + ["sell"]
+
     def update_menu(self, inp):
         t = self.sel
+        rows = self.menu_rows(t)
         if "UP" in inp.repeat:
-            self.menu = (self.menu - 1) % 4
+            self.menu = (self.menu - 1) % len(rows)
         if "DOWN" in inp.repeat:
-            self.menu = (self.menu + 1) % 4
+            self.menu = (self.menu + 1) % len(rows)
         if "B" in inp.pressed:
             self.mode = "normal"
             return
@@ -1506,14 +1517,20 @@ class Game:
             i = self.towers.index(t) + (1 if "R" in inp.pressed else -1)
             self.sel = t = self.towers[i % len(self.towers)]
             self.cx, self.cy = t.x, t.y
-        if self.menu == 2 and t.key not in NO_TARGETING:
+            rows = self.menu_rows(t)
+            self.menu = min(self.menu, len(rows) - 1)
+        row = rows[self.menu]
+        if row == "curve" and ("LEFT" in inp.pressed or "RIGHT" in inp.pressed or "A" in inp.pressed):
+            t.curve = -t.curve
+            return
+        if row == "target" and t.key not in NO_TARGETING:
             if "LEFT" in inp.repeat:
                 t.target_mode = (t.target_mode - 1) % len(TARGET_MODES)
             if "RIGHT" in inp.repeat or "A" in inp.pressed:
                 t.target_mode = (t.target_mode + 1) % len(TARGET_MODES)
         if "A" not in inp.pressed:
             return
-        if self.menu in (0, 1):
+        if row in ("upgrade0", "upgrade1"):
             p = self.menu
             state = t.upgrade_state(p)
             if state == "max":
@@ -1532,7 +1549,7 @@ class Game:
                     self.refresh_buffs()
                     self.app.sounds.play("upgrade")
                     self.add_fx("ring", t.x, t.y, 0.3, (TOWER_R + 10, YELLOW))
-        elif self.menu == 3:
+        elif row == "sell":
             value = int(t.spent * SELL_RATE)
             self.money += value
             self.towers.remove(t)
@@ -1812,7 +1829,7 @@ class Game:
         """Upgrade menu for the selected tower, drawn over the map."""
         app = self.app
         t = self.sel
-        h = 214
+        h = 70 + 36 * len(self.menu_rows(t))
         y0 = MAP_Y + MAP_H - h - 4 if t.y < MAP_Y + MAP_H / 2 else MAP_Y + 4
         box = pygame.Rect(6, y0, SCREEN_W - 12, h)
         pygame.draw.rect(surf, (28, 32, 46), box, border_radius=10)
@@ -1846,6 +1863,9 @@ class Game:
         else:
             rows.append(("Target: < %s >" % TARGET_MODES[t.target_mode], WHITE,
                          "Which balloon to shoot first"))
+        if t.key == "boom":
+            rows.append(("Curve: < %s >" % ("Right" if t.curve > 0 else "Left"), WHITE,
+                         "Which way the boomerang flies"))
         value = int(t.spent * SELL_RATE)
         rows.append(("Sell  +$%d" % value, (255, 200, 120), "Remove tower, get money back"))
 
