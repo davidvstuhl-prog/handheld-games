@@ -19,6 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
+VERSION = "v2 (13 towers, 7 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -2097,6 +2098,8 @@ class App:
         img = self.text(self.f_small, info, WHITE)
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 300)))
         self.draw_menu_list(surf, self.title_items(), self.title_idx, 338, 46)
+        img = self.text(self.f_small, VERSION, (190, 210, 240))
+        surf.blit(img, (SCREEN_W - img.get_width() - 6, 4))
 
     HELP = [
         ("GOAL", YELLOW),

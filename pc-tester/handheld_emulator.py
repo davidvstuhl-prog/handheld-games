@@ -19,8 +19,8 @@ import sys
 import pygame
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "balloon-blitz"))
-sys.path.insert(0, HERE)   # also works if balloon_blitz.py is copied in here
+sys.path.insert(0, HERE)   # a copy of balloon_blitz.py in here works too...
+sys.path.insert(0, os.path.join(HERE, "..", "balloon-blitz"))   # ...but the real one wins
 import balloon_blitz as bb  # noqa: E402
 
 WIN_W, WIN_H = 1000, 750
@@ -133,6 +133,7 @@ def main():
     # SCALED lets you resize/maximize the window and keeps it sharp.
     screen = pygame.display.set_mode((WIN_W, WIN_H), pygame.SCALED | pygame.RESIZABLE)
     canvas = pygame.Surface((bb.SCREEN_W, bb.SCREEN_H)).convert()
+    print("Loaded Balloon Blitz %s from %s" % (getattr(bb, "VERSION", "(old version)"), bb.__file__))
     EmulatorApp(screen, canvas).run()
     pygame.quit()
 
