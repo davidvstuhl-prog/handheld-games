@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v2.1 (13 towers, 7 maps)"
+VERSION = "v2.2 (13 towers, 7 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -131,9 +131,10 @@ TOWER_TYPES = [
                    dtype="sharp", count=1, spread=0.0),
          paths=[
              [("Sharp Darts", 120, "Darts pop 1 more balloon", {"pierce": ("+", 1)}),
-              ("Razor Darts", 185, "Darts pop 2 more balloons", {"pierce": ("+", 2)}),
               ("Triple Shot", 340, "Throws 3 darts at once",
-               {"count": ("=", 3), "spread": ("=", 0.22)})],
+               {"count": ("=", 3), "spread": ("=", 0.22)}),
+              ("Spike Ball", 1100, "Rolls a huge spiked ball, bounces once",
+               {"spikeball": ("=", True), "count": ("=", 1), "rate": ("*", 1.5)})],
              [("Long Range", 75, "+30 range", {"range": ("+", 30)}),
               ("Eagle Eye", 135, "Can see camo balloons",
                {"camo": ("=", True), "range": ("+", 15)}),
@@ -183,7 +184,7 @@ TOWER_TYPES = [
          ]),
     dict(key="glue", name="Glue Gunner", cost=200,
          desc="Glue slows balloons down",
-         base=dict(range=115, rate=1.0, pierce=1, speed=380, slow=0.5, glue_time=11,
+         base=dict(range=115, rate=0.7, pierce=1, speed=380, slow=0.5, glue_time=11,
                    acid=0, splash=0, glue_blimp=False, count=1, spread=0.0),
          paths=[
              [("Sticky Glue", 150, "Slows more, lasts longer",
@@ -304,6 +305,7 @@ TOWER_TYPES = [
          ]),
 ]
 TARGET_MODES = ["First", "Last", "Strong", "Close"]
+SOUND_ROW = "<sound slider>"   # menus draw this row as a volume slider
 NO_TARGETING = ("mine", "frost", "spike", "village")   # towers that don't aim
 
 # =====================================================================
@@ -473,6 +475,7 @@ class Sounds:
         self.ok = False
         self.sounds = {}
         self.last_pop = 0
+        self.volume = 0.7   # 0.0 (muted) to 1.0
         try:
             init = pygame.mixer.get_init()
             if not init:
@@ -503,8 +506,13 @@ class Sounds:
                 data.append(v)
         return pygame.mixer.Sound(buffer=data.tobytes())
 
+    def set_volume(self, volume):
+        self.volume = max(0.0, min(1.0, volume))
+        for snd in self.sounds.values():
+            snd.set_volume(self.volume)
+
     def play(self, name):
-        if not self.ok:
+        if not self.ok or self.volume <= 0:
             return
         if name == "pop":   # many balloons pop at once; don't play them all
             now = pygame.time.get_ticks()
@@ -622,7 +630,7 @@ class Tower:
 class Proj:
     __slots__ = ("kind", "x", "y", "vx", "vy", "life", "dmg", "pierce", "dtype",
                  "r", "hit", "tower", "blast", "cluster", "bm", "dead", "angle", "homing",
-                 "turn", "knock")
+                 "turn", "knock", "bounces")
 
     def __init__(self, kind, x, y, angle, speed, life, dmg, pierce, dtype, r, tower):
         self.kind = kind
@@ -643,6 +651,7 @@ class Proj:
         self.homing = False
         self.turn = 0.0          # boomerangs curve (radians per second)
         self.knock = 0           # push balloons back this far on hit
+        self.bounces = 0         # Spike Ball: walls it can still bounce off
 
 
 # =====================================================================
@@ -650,6 +659,30 @@ class Proj:
 # =====================================================================
 def darker(c, f=0.6):
     return tuple(int(v * f) for v in c[:3])
+
+
+LIGHT = (-0.45, -0.55, 0.70)   # light comes from the top left
+
+
+def shade_ball(s, cx, cy, rx, ry, strength=1.0):
+    """Make a flat circle/ellipse on sprite s look round: darker away from the
+    light, plus a shiny spot. Done once when the sprite is made."""
+    w, h = s.get_size()
+    for y in range(max(0, int(cy - ry)), min(h, int(cy + ry) + 1)):
+        for x in range(max(0, int(cx - rx)), min(w, int(cx + rx) + 1)):
+            nx, ny = (x - cx) / rx, (y - cy) / ry
+            d = nx * nx + ny * ny
+            if d >= 1.0:
+                continue
+            r, g, b, a = s.get_at((x, y))
+            if a == 0:
+                continue
+            nz = math.sqrt(1.0 - d)
+            light = max(0.0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2])
+            f = 1.0 + strength * (0.6 * light - 0.35)
+            shine = strength * 150 * light ** 14
+            s.set_at((x, y), (min(255, int(r * f + shine)), min(255, int(g * f + shine)),
+                              min(255, int(b * f + shine)), a))
 
 
 def make_balloon_sprite(name, camo):
@@ -679,14 +712,13 @@ def make_balloon_sprite(name, camo):
         pygame.draw.circle(s, (215, 150, 80), (c, c), r - 4, 3)
     if name == "lead":
         pygame.draw.circle(s, (85, 90, 100), (c, c), r, 3)
-    pygame.draw.circle(s, dark, (c, c), r, 2)
-    pygame.draw.circle(s, (255, 255, 255, 180), (c - r // 3, c - r // 3), max(2, r // 4))
     if camo:
         spots = [(-0.4, 0.1, 0.32), (0.35, -0.3, 0.28), (0.2, 0.45, 0.25), (-0.1, -0.5, 0.2)]
         for i, (sx, sy, sr) in enumerate(spots):
             pygame.draw.circle(s, (70, 100, 40) if i % 2 else (110, 130, 60),
                                (int(c + sx * r), int(c + sy * r)), max(2, int(sr * r)))
-        pygame.draw.circle(s, (40, 70, 30), (c, c), r, 2)
+    shade_ball(s, c, c, r, r)
+    pygame.draw.circle(s, (40, 70, 30) if camo else dark, (c, c), r, 2)
     return s, c, c
 
 
@@ -702,10 +734,10 @@ def make_blimp_sprites(name):
     pygame.draw.polygon(s, dark, [(0, h + 8), (22, cy + 4), (8, cy + 4)])
     body = pygame.Rect(6, 5, w, h)
     pygame.draw.ellipse(s, col, body)
-    pygame.draw.ellipse(s, darker(col, 0.8), body.inflate(-w // 3, -h // 2))
     pygame.draw.line(s, (240, 240, 240), (6 + int(w * 0.62), 8), (6 + int(w * 0.62), h + 2), 4)
+    pygame.draw.rect(s, darker(col, 0.7), (6 + int(w * 0.25), cy + h // 3 - 2, w // 3, 6), border_radius=3)
+    shade_ball(s, 6 + w / 2, 5 + h / 2, w / 2, h / 2)
     pygame.draw.ellipse(s, dark, body, 3)
-    pygame.draw.ellipse(s, (255, 255, 255, 140), (6 + w // 2, 9, w // 4, h // 5))
     cx = s.get_width() // 2
     out = {"R": (s, cx, cy), "L": (pygame.transform.flip(s, True, False), cx, cy)}
     down = pygame.transform.rotate(s, -90)
@@ -719,6 +751,14 @@ def make_tower_sprite(key, font):
     s = pygame.Surface((44, 44), pygame.SRCALPHA)
     c = 22
     r = TOWER_R
+    # a round stone base every tower stands on
+    pygame.draw.circle(s, (96, 92, 88), (c, c), r + 3)
+    pygame.draw.circle(s, (150, 144, 136), (c, c), r + 2)
+    for i in range(8):
+        a = i * math.pi / 4 + 0.2
+        pygame.draw.line(s, (110, 105, 100), (c + (r - 1) * math.cos(a), c + (r - 1) * math.sin(a)),
+                         (c + (r + 2) * math.cos(a), c + (r + 2) * math.sin(a)), 1)
+    shade_ball(s, c, c, r + 3, r + 3, 0.6)
     if key == "dart":
         pygame.draw.circle(s, (125, 82, 45), (c, c), r)
         pygame.draw.circle(s, (195, 150, 100), (c, c), r - 7)
@@ -805,6 +845,14 @@ def make_tower_sprite(key, font):
         pygame.draw.rect(s, (110, 75, 20), rect, 3, border_radius=6)
         t = font.render("$", True, (110, 75, 20))
         s.blit(t, t.get_rect(center=(c, c + 1)))
+    return s
+
+
+def finish_tower_sprite(s):
+    """A soft shine on the top-left of the tower body."""
+    shine = pygame.Surface(s.get_size(), pygame.SRCALPHA)
+    pygame.draw.arc(shine, (255, 255, 255, 120), (6, 6, 32, 32), math.radians(100), math.radians(170), 3)
+    s.blit(shine, (0, 0))
     return s
 
 
@@ -996,7 +1044,7 @@ class Game:
         self.money += 1
         if tower:
             tower.pops += 1
-        self.add_fx("pop", b.x, b.y, 0.18, b.info["color"])
+        self.add_fx("pop", b.x, b.y, 0.32, (b.info["color"], b.id))
         self.app.sounds.play("pop")
         kids = []
         for i, child in enumerate(b.info["children"]):
@@ -1133,7 +1181,14 @@ class Game:
             return
         t.cool = s["rate"]
         t.flash = 0.08
-        if t.key in ("dart", "ninja", "super", "glue"):
+        if t.key == "dart" and s.get("spikeball"):
+            ax, ay = self.lead(t, tgt, 330)
+            t.angle = math.atan2(ay - t.y, ax - t.x)
+            ball = Proj("spikeball", t.x + math.cos(t.angle) * 16, t.y + math.sin(t.angle) * 16, t.angle,
+                        330, 8.0, 2, 40, "normal", 12, t)
+            ball.bounces = 1
+            self.projs.append(ball)
+        elif t.key in ("dart", "ninja", "super", "glue"):
             kind = {"dart": "dart", "ninja": "star", "super": "laser", "glue": "glue"}[t.key]
             ax, ay = self.lead(t, tgt, s["speed"])
             t.angle = math.atan2(ay - t.y, ax - t.x)
@@ -1344,6 +1399,20 @@ class Game:
             p.x += p.vx * dt
             p.y += p.vy * dt
             p.life -= dt
+            if p.kind == "spikeball":
+                p.angle += 8 * dt   # rolling
+                hit_x = p.x < p.r or p.x > SCREEN_W - p.r
+                hit_y = p.y < MAP_Y + p.r or p.y > PANEL_Y - p.r
+                if (hit_x or hit_y) and p.bounces > 0:   # after its one bounce it rolls off the field
+                    p.bounces -= 1
+                    if hit_x:
+                        p.vx = -p.vx
+                        p.x = max(p.r, min(SCREEN_W - p.r, p.x))
+                    if hit_y:
+                        p.vy = -p.vy
+                        p.y = max(MAP_Y + p.r, min(PANEL_Y - p.r, p.y))
+                    p.hit.clear()   # it can hit balloons again on the way back
+                    self.add_fx("ring", p.x, p.y, 0.2, (16, (220, 220, 230)))
             if p.life <= 0 or p.x < -20 or p.x > SCREEN_W + 20 or p.y < MAP_Y - 20 or p.y > PANEL_Y + 20:
                 p.dead = True
                 if p.kind in ("bomb", "mini"):
@@ -1560,7 +1629,8 @@ class Game:
 
     def overlay_items(self):
         if self.overlay == "pause":
-            return ["Resume", "Auto-start: %s" % ("ON" if self.auto else "OFF"), "Restart", "Quit to title"]
+            return ["Resume", "Auto-start: %s" % ("ON" if self.auto else "OFF"), SOUND_ROW,
+                    "Restart", "Quit to title"]
         if self.overlay == "win":
             return ["Keep playing", "Quit to title"]
         return ["Try again", "Quit to title"]
@@ -1574,9 +1644,16 @@ class Game:
         if self.overlay == "pause" and ("B" in inp.pressed or "START" in inp.pressed):
             self.overlay = None
             return
+        choice = items[self.over_idx]
+        if choice == SOUND_ROW:
+            step = ("RIGHT" in inp.repeat) - ("LEFT" in inp.repeat)
+            if step:
+                self.app.change_volume(10 * step)
+            elif "A" in inp.pressed:
+                self.app.change_volume(-100 if self.app.save.get("volume", 70) else 70)
+            return
         if "A" not in inp.pressed:
             return
-        choice = items[self.over_idx]
         if choice in ("Resume", "Keep playing"):
             self.overlay = None
         elif choice.startswith("Auto-start"):
@@ -1602,8 +1679,16 @@ class Game:
                 pygame.draw.polygon(surf, (70, 70, 80), [(px, py - 5), (px - 4, py + 3), (px + 4, py + 3)], 1)
 
         for t in self.towers:
+            sh = app.shadow(40, 14)
+            surf.blit(sh, (t.x - 20, t.y + 10))
+        for t in self.towers:
             self.draw_tower(surf, t)
 
+        now = pygame.time.get_ticks() / 1000.0
+        for b in self.balloons:   # shadows on the ground first
+            w = b.info.get("w", b.r * 2) * 0.8
+            sh = app.shadow(int(w), max(5, int(b.r * 0.6)))
+            surf.blit(sh, (b.x - w / 2 + 3, b.y + b.r * 0.9 + 4))
         for b in self.balloons:
             if b.info.get("blimp"):
                 ux, uy = b.path.segs[b.seg][2:4]
@@ -1619,7 +1704,8 @@ class Game:
                     pygame.draw.ellipse(surf, (190, 235, 255), (b.x - w / 2, b.y - 10, w, 20), 3)
             else:
                 spr, ox, oy = app.balloon_sprites[(b.name, b.camo)]
-                surf.blit(spr, (b.x - ox, b.y - oy))
+                bob = 0 if b.frozen > 0 else math.sin(now * 5 + b.id) * 1.5   # gentle float
+                surf.blit(spr, (b.x - ox, b.y - oy + bob))
                 if b.frozen > 0:
                     surf.blit(app.ice_sprite(b.r), (b.x - b.r - 3, b.y - b.r - 3))
             if b.glue > 0:
@@ -1633,6 +1719,17 @@ class Game:
                 ex, ey = math.cos(p.angle) * 9, math.sin(p.angle) * 9
                 pygame.draw.line(surf, (60, 40, 20), (p.x - ex, p.y - ey), (p.x + ex, p.y + ey), 4)
                 pygame.draw.circle(surf, (230, 230, 230), (int(p.x + ex), int(p.y + ey)), 2)
+            elif p.kind == "spikeball":
+                cx, cy = int(p.x), int(p.y)
+                for i in range(8):
+                    a = p.angle + i * math.pi / 4
+                    tip = (p.x + math.cos(a) * 17, p.y + math.sin(a) * 17)
+                    l = (p.x + math.cos(a - 0.35) * 10, p.y + math.sin(a - 0.35) * 10)
+                    r = (p.x + math.cos(a + 0.35) * 10, p.y + math.sin(a + 0.35) * 10)
+                    pygame.draw.polygon(surf, (200, 200, 210), [tip, l, r])
+                pygame.draw.circle(surf, (60, 60, 70), (cx, cy), 11)
+                pygame.draw.circle(surf, (110, 110, 125), (cx - 3, cy - 3), 5)
+                pygame.draw.circle(surf, (30, 30, 36), (cx, cy), 11, 2)
             elif p.kind == "star":
                 pts = []
                 for i in range(8):
@@ -1731,11 +1828,16 @@ class Game:
         for kind, x, y, t, dur, data in self.fx:
             p = t / dur
             if kind == "pop":
-                r = 6 + 14 * p
-                for i in range(6):
-                    a = i * math.pi / 3 + 0.4
-                    pygame.draw.line(surf, data, (x + math.cos(a) * r * 0.5, y + math.sin(a) * r * 0.5),
-                                     (x + math.cos(a) * r, y + math.sin(a) * r), 3)
+                col, seed = data
+                if p < 0.3:   # quick white flash
+                    pygame.draw.circle(surf, WHITE, (int(x), int(y)), int(4 + 20 * p), 2)
+                for i in range(7):   # confetti flying out, then falling
+                    a = i * 0.9 + seed
+                    speed = 60 + (seed * 37 + i * 13) % 40
+                    px = x + math.cos(a) * speed * t
+                    py = y + math.sin(a) * speed * t + 140 * t * t
+                    size = 4 if i % 2 else 3
+                    pygame.draw.rect(surf, col if i % 3 else WHITE, (int(px), int(py), size, size - 1))
             elif kind == "ring":
                 rad, col = data
                 pygame.draw.circle(surf, col, (int(x), int(y)), max(3, int(rad * (0.4 + 0.6 * p))), 3)
@@ -1753,7 +1855,10 @@ class Game:
 
     def draw_hud(self, surf):
         app = self.app
-        pygame.draw.rect(surf, HUD_BG, (0, 0, SCREEN_W, HUD_H))
+        surf.blit(app.hud_bg, (0, 0))
+        for rect in ((4, 5, 86, 30), (114, 5, 112, 30)):   # pills behind lives and money
+            pygame.draw.rect(surf, (18, 21, 31), rect, border_radius=15)
+            pygame.draw.rect(surf, (70, 78, 105), rect, 1, border_radius=15)
         # heart
         pygame.draw.circle(surf, RED, (14, 17), 7)
         pygame.draw.circle(surf, RED, (26, 17), 7)
@@ -1801,7 +1906,7 @@ class Game:
 
     def draw_panel(self, surf):
         app = self.app
-        pygame.draw.rect(surf, PANEL_BG, (0, PANEL_Y, SCREEN_W, PANEL_H))
+        surf.blit(app.panel_bg, (0, PANEL_Y))
         pygame.draw.line(surf, (80, 85, 105), (0, PANEL_Y), (SCREEN_W, PANEL_Y), 2)
         if self.mode == "place":
             self.draw_shop_strip(surf, True)
@@ -1886,7 +1991,7 @@ class Game:
         app = self.app
         surf.blit(app.dim, (0, 0))
         if self.overlay == "pause":
-            title, sub = "Paused", "Round %d" % self.round
+            title, sub = "Paused", "Round %d" % max(1, self.round)
         elif self.overlay == "over":
             title, sub = "Game Over", "You made it to round %d" % self.round
         else:
@@ -1920,7 +2025,11 @@ class App:
         self.balloon_sprites = {(n, c): make_balloon_sprite(n, c)
                                 for n, i in BALLOON_TYPES.items() if not i.get("blimp") for c in (False, True)}
         self.blimp_sprites = {n: make_blimp_sprites(n) for n, i in BALLOON_TYPES.items() if i.get("blimp")}
-        self.tower_sprites = {tt["key"]: make_tower_sprite(tt["key"], self.f_med) for tt in TOWER_TYPES}
+        self.tower_sprites = {tt["key"]: finish_tower_sprite(make_tower_sprite(tt["key"], self.f_med))
+                              for tt in TOWER_TYPES}
+        self.shadows = {}   # soft shadows, by size
+        self.hud_bg = self.gradient(SCREEN_W, HUD_H, (44, 50, 72), (22, 25, 36))
+        self.panel_bg = self.gradient(SCREEN_W, PANEL_H, (46, 51, 70), (26, 29, 41))
         self.ghost_sprites = {}   # see-through copies for the "where will it go" preview
         for key, spr in self.tower_sprites.items():
             ghost = spr.copy()
@@ -1929,8 +2038,9 @@ class App:
         self.dim = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
         self.dim.fill((0, 0, 0, 160))
         self.save = self.load_save()
+        self.sounds.set_volume(self.save.get("volume", 70) / 100.0)
         self.state = "title"
-        self.title_idx = 3   # "Start game"
+        self.title_idx = 4   # "Start game"
         self.map_idx = 0
         self.diff_idx = 1
         self.game = None
@@ -1960,9 +2070,14 @@ class App:
         surf = pygame.Surface((SCREEN_W, MAP_H)).convert()
         surf.fill(GRASS)
         rnd = random.Random(mp["seed"])
-        for _ in range(26):
-            pygame.draw.circle(surf, GRASS_DARK, (rnd.randrange(SCREEN_W), rnd.randrange(MAP_H)),
-                               rnd.randrange(18, 40))
+        for i in range(-MAP_H, SCREEN_W, 48):   # mowed-lawn stripes
+            pygame.draw.polygon(surf, (95, 175, 79), [(i, 0), (i + 24, 0), (i + 24 + MAP_H, MAP_H), (i + MAP_H, MAP_H)])
+        patch = pygame.Surface((80, 80), pygame.SRCALPHA)
+        for _ in range(26):   # soft darker patches
+            patch.fill((0, 0, 0, 0))
+            rr = rnd.randrange(18, 40)
+            pygame.draw.circle(patch, GRASS_DARK + (110,), (40, 40), rr)
+            surf.blit(patch, (rnd.randrange(SCREEN_W) - 40, rnd.randrange(MAP_H) - 40))
         for _ in range(160):
             x, y = rnd.randrange(SCREEN_W), rnd.randrange(MAP_H)
             pygame.draw.line(surf, (60, 125, 50), (x, y), (x + rnd.choice((-3, 3)), y - 6), 2)
@@ -1982,6 +2097,13 @@ class App:
                 for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
                     surf.fill(col, pygame.Rect(min(x0, x1) - half, min(y0, y1) - half,
                                                abs(x1 - x0) + 2 * half, abs(y1 - y0) + 2 * half))
+        for pts in mp["paths"]:   # wheel ruts down the middle of the track
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+                horiz = y0 == y1
+                for off in (-8, 8):
+                    a = (x0, y0 + off) if horiz else (x0 + off, y0)
+                    b = (x1, y1 + off) if horiz else (x1 + off, y1)
+                    pygame.draw.line(surf, (196, 166, 112), a, b, 3)
         for pts in mp["paths"]:
             for (x0, y0), (x1, y1) in zip(pts, pts[1:]):   # little pebbles on the track
                 for _ in range(int(math.hypot(x1 - x0, y1 - y0) / 25)):
@@ -1993,12 +2115,32 @@ class App:
             if 0 <= ex <= SCREEN_W and 0 <= ey <= MAP_H:   # track ends in a hole
                 pygame.draw.circle(surf, (60, 45, 30), (ex, ey), PATH_W // 2 + 2)
                 pygame.draw.circle(surf, (15, 10, 5), (ex, ey), PATH_W // 2 - 4)
+        shade = pygame.Surface((SCREEN_W, MAP_H), pygame.SRCALPHA)   # darker edges, for depth
+        for i in range(14):
+            pygame.draw.rect(shade, (0, 0, 0, 7), (i, i, SCREEN_W - 2 * i, MAP_H - 2 * i), 1)
         for x, y, r in mp.get("rocks", []):
             pygame.draw.circle(surf, (95, 90, 85), (x, y + 3), r)
             pygame.draw.circle(surf, (135, 128, 120), (x, y), r)
             pygame.draw.circle(surf, (165, 158, 150), (x - r // 3, y - r // 3), r // 3)
             pygame.draw.circle(surf, (85, 80, 75), (x, y), r, 2)
+        surf.blit(shade, (0, 0))
         return surf
+
+    def gradient(self, w, h, top, bottom):
+        g = pygame.Surface((w, h)).convert()
+        for y in range(h):
+            f = y / max(1, h - 1)
+            g.fill(tuple(int(top[i] + (bottom[i] - top[i]) * f) for i in range(3)), (0, y, w, 1))
+        return g
+
+    def shadow(self, w, h):
+        key = (w, h)
+        if key not in self.shadows:
+            sh = pygame.Surface((w, h), pygame.SRCALPHA)
+            pygame.draw.ellipse(sh, (0, 0, 0, 60), (0, 0, w, h))
+            pygame.draw.ellipse(sh, (0, 0, 0, 40), (w // 6, h // 6, w * 2 // 3, h * 2 // 3))
+            self.shadows[key] = sh
+        return self.shadows[key]
 
     def range_sprite(self, r, ok):
         key = (r, ok)
@@ -2052,10 +2194,41 @@ class App:
         self.state = "title"
         self.game = None
 
+    def change_volume(self, step):
+        """Move the sound slider by step (in %), save it, and play a test pop."""
+        vol = max(0, min(100, self.save.get("volume", 70) + step))
+        self.save["volume"] = vol
+        self.write_save()
+        self.sounds.set_volume(vol / 100.0)
+        self.sounds.last_pop = 0
+        self.sounds.play("pop")
+
     def draw_menu_list(self, surf, items, idx, y, gap=52):
         for i, label in enumerate(items):
-            img = self.text(self.f_med, label, YELLOW if i == idx else WHITE)
-            r = img.get_rect(center=(SCREEN_W // 2, y + i * gap))
+            col = YELLOW if i == idx else WHITE
+            cy = y + i * gap
+            if label == SOUND_ROW:   # "Sound" with a slider bar
+                vol = self.save.get("volume", 70)
+                img = self.text(self.f_med, "Sound", col)
+                pct = self.text(self.f_small, "%d%%" % vol if vol else "OFF", col)
+                bar_w = 150
+                total = img.get_width() + 14 + bar_w + 12 + 46
+                x0 = SCREEN_W // 2 - total // 2
+                r = pygame.Rect(x0, cy - img.get_height() // 2, total, img.get_height())
+                if i == idx:
+                    pygame.draw.rect(surf, PANEL_HI, r.inflate(30, 14), border_radius=10)
+                    pygame.draw.rect(surf, YELLOW, r.inflate(30, 14), 2, border_radius=10)
+                surf.blit(img, (x0, r.y))
+                bx = x0 + img.get_width() + 14
+                pygame.draw.rect(surf, (20, 22, 32), (bx, cy - 6, bar_w, 12), border_radius=6)
+                pygame.draw.rect(surf, col, (bx, cy - 6, int(bar_w * vol / 100), 12), border_radius=6)
+                pygame.draw.rect(surf, (120, 130, 160), (bx, cy - 6, bar_w, 12), 1, border_radius=6)
+                pygame.draw.circle(surf, WHITE, (bx + int(bar_w * vol / 100), cy), 9)
+                pygame.draw.circle(surf, (60, 60, 80), (bx + int(bar_w * vol / 100), cy), 9, 2)
+                surf.blit(pct, (bx + bar_w + 14, cy - pct.get_height() // 2))
+                continue
+            img = self.text(self.f_med, label, col)
+            r = img.get_rect(center=(SCREEN_W // 2, cy))
             if i == idx:
                 pygame.draw.rect(surf, PANEL_HI, r.inflate(40, 14), border_radius=10)
                 pygame.draw.rect(surf, YELLOW, r.inflate(40, 14), 2, border_radius=10)
@@ -2065,7 +2238,7 @@ class App:
         return ["Map: < %s >" % MAPS[self.map_idx]["name"],
                 "Mode: < %s >" % DIFFICULTIES[self.diff_idx]["name"],
                 "Auto-start: < %s >" % ("ON" if self.save.get("auto_start") else "OFF"),
-                "Start game", "How to play", "Button test", "Quit"]
+                SOUND_ROW, "Start game", "How to play", "Button test", "Quit"]
 
     def update_title(self, dt):
         inp = self.inp
@@ -2081,16 +2254,21 @@ class App:
             self.diff_idx = (self.diff_idx + step) % len(DIFFICULTIES)
         if self.title_idx == 2 and (step or "A" in inp.pressed):
             self.set_auto_start(not self.save.get("auto_start"))
+        elif self.title_idx == 3:
+            if step:
+                self.change_volume(10 * step)
+            elif "A" in inp.pressed:   # A on the slider: mute / unmute
+                self.change_volume(-100 if self.save.get("volume", 70) else 70)
         elif "A" in inp.pressed or "START" in inp.pressed:
-            if self.title_idx in (0, 1, 2, 3):
+            if self.title_idx in (0, 1, 2, 4):
                 self.game = Game(self, self.map_idx, self.diff_idx)
                 self.state = "game"
-            elif self.title_idx == 4:
-                self.state = "help"
             elif self.title_idx == 5:
+                self.state = "help"
+            elif self.title_idx == 6:
                 self.state = "buttons"
                 self.btn_hold = 0.0
-            elif self.title_idx == 6:
+            elif self.title_idx == 7:
                 self.running = False
         for b in self.title_balloons:
             b[1] -= b[3] * dt
@@ -2109,15 +2287,15 @@ class App:
             surf.blit(sh, r.move(3, 3))
             surf.blit(img, r)
         # map preview
-        thumb = pygame.transform.smoothscale(self.map_bg(self.map_idx), (140, 140))
-        tr = thumb.get_rect(center=(SCREEN_W // 2, 210))
+        thumb = pygame.transform.smoothscale(self.map_bg(self.map_idx), (124, 124))
+        tr = thumb.get_rect(center=(SCREEN_W // 2, 196))
         pygame.draw.rect(surf, WHITE, tr.inflate(6, 6), border_radius=4)
         surf.blit(thumb, tr)
         mp = MAPS[self.map_idx]
         info = "%s map  -  Best: round %d" % (mp["level"], self.best(self.map_idx, self.diff_idx))
         img = self.text(self.f_small, info, WHITE)
-        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 300)))
-        self.draw_menu_list(surf, self.title_items(), self.title_idx, 338, 46)
+        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 276)))
+        self.draw_menu_list(surf, self.title_items(), self.title_idx, 316, 44)
         img = self.text(self.f_small, VERSION, (190, 210, 240))
         surf.blit(img, (SCREEN_W - img.get_width() - 6, 4))
 

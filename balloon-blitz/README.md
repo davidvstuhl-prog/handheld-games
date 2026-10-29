@@ -13,7 +13,9 @@ emulator in [`../pc-tester`](../pc-tester).
 - **A** on a tower opens its menu: buy upgrades, change targeting, or sell it.
 - **START** sends the next round (and pauses during a round).
 - **SELECT** toggles fast-forward.
-- **B** opens the menu (auto-start, restart, quit).
+- **B** opens the menu (auto-start, sound, restart, quit).
+- **Sound slider:** on the title screen and in the B menu. Left/right changes the
+  volume in 10% steps; A mutes and unmutes. Your setting is remembered.
 - Beat **round 30** to win, then keep going in freeplay.
 
 ### Auto-start
@@ -28,11 +30,11 @@ round 1 yourself, so you have time to build.
 
 | Tower | Cost | What it does |
 |---|---|---|
-| Dart Tower | $170 | Throws darts at one balloon |
+| Dart Tower | $170 | Throws darts at one balloon; top upgrade rolls a bouncing Spike Ball |
 | Tack Shooter | $280 | Fires 12 tacks in every direction |
 | Boomerang | $325 | Curved throw that comes back, pops a lot (set Left/Right curve in its menu) |
 | Bomb Tower | $500 | Explosions pop groups and lead (not black) |
-| Glue Gunner | $200 | Slows balloons; acid glue pops them |
+| Glue Gunner | $200 | Fast-firing glue slows balloons; acid glue pops them |
 | Frost Tower | $350 | Freezes balloons around it |
 | Ninja | $400 | Fast throwing stars, sees camo |
 | Sniper | $350 | Hits anything anywhere on the map |
