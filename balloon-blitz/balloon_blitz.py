@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v2.2 (13 towers, 7 maps)"
+VERSION = "v2.3 (13 towers, 7 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -305,6 +305,8 @@ TOWER_TYPES = [
          ]),
 ]
 TARGET_MODES = ["First", "Last", "Strong", "Close"]
+TOWER_SPEED_BOOST = 0.85   # all towers attack 15% faster
+EXTRA_PIERCE_TOWERS = ("dart", "tack", "boom", "ninja", "wizard", "super")   # +1 pierce
 SOUND_ROW = "<sound slider>"   # menus draw this row as a volume slider
 NO_TARGETING = ("mine", "frost", "spike", "village")   # towers that don't aim
 
@@ -345,9 +347,9 @@ MAPS = [
 ]
 
 DIFFICULTIES = [
-    dict(name="Easy", lives=200, cost=0.8, speed=0.95),
-    dict(name="Normal", lives=150, cost=1.0, speed=1.0),
-    dict(name="Hard", lives=100, cost=1.08, speed=1.1),
+    dict(name="Easy", lives=200, cost=0.8, speed=0.9, money=850),
+    dict(name="Normal", lives=150, cost=1.0, speed=1.0, money=START_MONEY),
+    dict(name="Hard", lives=100, cost=1.08, speed=1.1, money=START_MONEY),
 ]
 
 # =====================================================================
@@ -615,6 +617,11 @@ class Tower:
                         s[k] = s.get(k, 1) * v
                     else:
                         s[k] = v
+        # every tower got a power boost after playtesting
+        if "rate" in s:
+            s["rate"] *= TOWER_SPEED_BOOST
+        if self.key in EXTRA_PIERCE_TOWERS:
+            s["pierce"] += 1
         self.s = s
 
     def upgrade_state(self, p):
@@ -884,7 +891,7 @@ class Game:
         self.projs = []
         self.spikes = []            # spike piles: [x, y, pierce left, life, tower]
         self.fx = []                # visual effects
-        self.money = START_MONEY + self.mp.get("extra_money", 0)   # two-lane maps pay more
+        self.money = self.diff["money"] + self.mp.get("extra_money", 0)   # two-lane maps pay more
         self.lives = self.diff["lives"]
         self.round = 0              # the round being played / last played
         self.active = False         # is a round running?

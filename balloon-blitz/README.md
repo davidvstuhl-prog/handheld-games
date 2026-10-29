@@ -17,6 +17,7 @@ emulator in [`../pc-tester`](../pc-tester).
 - **Sound slider:** on the title screen and in the B menu. Left/right changes the
   volume in 10% steps; A mutes and unmutes. Your setting is remembered.
 - Beat **round 30** to win, then keep going in freeplay.
+- **Easy** starts with $850 (instead of $650), slower balloons and cheaper towers.
 
 ### Auto-start
 
@@ -45,6 +46,9 @@ round 1 yourself, so you have time to build.
 | Coin Mine | $600 | Earns money every round |
 
 The shop bar shows 7 towers at a time; press L / R to scroll through all 13.
+All towers attack a bit faster than their upgrade descriptions suggest (a 15% power boost),
+and darts, tacks, boomerangs, stars, magic and the Super Tower pop one extra balloon per shot.
+
 Every tower has **two upgrade paths with 3 levels each**. Only one path can
 reach level 3 (like in BTD6).
 
