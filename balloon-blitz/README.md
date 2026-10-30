@@ -26,6 +26,27 @@ computer, unzip it and double-click **BalloonBlitz**. `PLAYING.txt` inside expla
 - **Settings**: auto-start, sound slider and the button test
 - **How to Play** and **Quit**
 
+## Mouse, keyboard or controller
+
+Everything works with any of them:
+- **Mouse:** click a tower in the shop, then click the map to build it. Click towers to
+  upgrade, sell or retarget them, click the round ability buttons to use abilities, and
+  use the top-right buttons for start/pause, speed and the menu. Right-click goes back,
+  the wheel scrolls.
+- **Keyboard:** arrows, Z = A, X = B, A/S = L/R, Enter = START, Tab = SELECT, D = abilities,
+  F11 = fullscreen.
+- **Controller / the handheld:** D-pad, A, B, L, R, START, SELECT (L + R together = abilities).
+
+## Putting it on Steam (checklist)
+
+- All tower, upgrade and balloon names are original (no names from other games).
+- You need a **Steamworks** account and the **$100 Steam Direct fee** per game. Steamworks
+  needs an adult to sign the agreements and handle payments and taxes.
+- You'll need a store page: description, screenshots, a trailer and capsule art.
+- The Windows build from the **PC build** release is what you upload. Steam achievements
+  need the Steamworks SDK; the in-game achievements already work.
+- Valve reviews the build and store page before release.
+
 ## Modifiers
 
 Pick one on the Play screen under the difficulty for an extra challenge:
