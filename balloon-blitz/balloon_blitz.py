@@ -19,14 +19,15 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v4.1 (16 towers, 5 tiers, 5 heroes, 8 maps)"
+VERSION = "v4.2 (150 rounds, 16 towers, 5 heroes, 8 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
 PANEL_Y = MAP_Y + MAP_H         # bottom panel (shop / hints)
 PANEL_H = SCREEN_H - PANEL_Y
 FPS = 60
-WIN_ROUND = 30                  # beat this round to win (then freeplay)
+WIN_ROUND = 30                  # beat this round to win (then keep going)
+FINAL_ROUND = 150               # beat this one to be Champion (then freeplay)
 START_MONEY = 650
 BALLOON_SPEED = 65.0            # pixels per second for a red balloon
 PATH_W = 40                     # width of the balloon track
@@ -106,6 +107,16 @@ BALLOON_TYPES = {
                     children=["ceramic"] * 4, blimp=True),
     "titan":   dict(color=(195, 45, 65),   r=40, w=104, h=54, speed=0.6, hp=500,
                     children=["blimp"] * 3, blimp=True),
+    # fast, always camo, shrugs off darts/tacks and explosions
+    "phantom": dict(color=(60, 62, 72),    r=26, w=76, h=30, speed=2.75, hp=300,
+                    children=["ceramic"] * 6, blimp=True, always_camo=True, immune={"sharp", "explode"}),
+    # a huge armored blimp
+    "colossus": dict(color=(45, 125, 65),  r=52, w=134, h=68, speed=0.45, hp=2000,
+                     children=["titan"] * 4, blimp=True),
+    # the final boss: can't be frozen, slowed, glued, pushed or lifted
+    "overlord": dict(color=(105, 35, 125), r=62, w=164, h=82, speed=0.3, hp=15000,
+                     children=["colossus", "colossus", "phantom", "phantom", "phantom"], blimp=True,
+                     unstoppable=True),
 }
 BALLOON_ORDER = list(BALLOON_TYPES)   # used for "Strong" targeting
 for _info in BALLOON_TYPES.values():
@@ -119,7 +130,7 @@ SANDBOX_AMOUNTS = [1, 5, 10, 25, 50]
 # Regrow balloons grow back one layer at a time along this chain.
 REGROW_UP = {"red": "blue", "blue": "green", "green": "yellow", "yellow": "pink"}
 REGROW_TIME = 3.0
-FORTIFIABLE = ("lead", "ceramic", "blimp", "titan")   # armored versions take 2x hits
+FORTIFIABLE = ("lead", "ceramic", "blimp", "titan", "phantom", "colossus", "overlord")   # armored versions take 2x hits
 
 # "Red balloon equivalent": how many lives a balloon costs if it gets
 # through, counting everything inside it.
@@ -835,13 +846,25 @@ ROUNDS = [
 
 
 def freeplay_round(n):
-    """Rounds after the last designed one keep getting harder."""
+    """Rounds 31-150 (and freeplay after that) get steadily harder:
+    Phantoms from round 45, Colossi from round 50, the Overlord at 100, 125 and 150."""
     k = n - len(ROUNDS)
-    groups = [("ceramic", 20 + 3 * k, max(0.15, 0.5 - 0.01 * k), 0, "c" if k % 2 == 0 else "f"),
-              ("purple", 10 + k, 0.4, 3),
-              ("blimp", 2 + k // 2, max(0.8, 2.5 - 0.08 * k), 6, "f" if k >= 4 else "")]
-    if k >= 3:
-        groups.append(("titan", k // 3, 6, 15))
+    flags = ["", "c", "f", "cf"][n % 4]
+    groups = [("ceramic", min(25 + k // 2, 70), max(0.12, 0.45 - 0.003 * k), 0, flags),
+              ("blimp", min(1 + k // 6, 20), max(0.6, 2.2 - 0.012 * k), 6, "f" if n >= 60 else "")]
+    if n % 3 == 0:
+        groups.append(("purple", min(10 + k // 3, 40), 0.3, 2))
+    if n % 5 == 0:
+        groups.append(("lead", 20, 0.25, 3, "f"))
+    if n >= 35:
+        groups.append(("titan", min(1 + (n - 35) // 8, 12), max(1.0, 4 - 0.03 * (n - 35)), 12,
+                       "f" if n >= 80 else ""))
+    if n >= 45:
+        groups.append(("phantom", min(1 + (n - 45) // 5, 20), max(0.5, 2.0 - 0.015 * (n - 45)), 8))
+    if (n >= 50 and n % 10 == 0) or (n >= 90 and n % 5 == 0):
+        groups.append(("colossus", 1 + (n - 50) // 30, 6, 20, "f" if n >= 110 else ""))
+    if n in (100, 125, FINAL_ROUND) or (n > FINAL_ROUND and n % 10 == 0):
+        groups.append(("overlord", 1 + max(0, n - FINAL_ROUND) // 30, 8, 30))
     return groups
 
 
@@ -1234,8 +1257,23 @@ def make_blimp_sprites(name):
     pygame.draw.polygon(s, dark, [(0, h + 8), (22, cy + 4), (8, cy + 4)])
     body = pygame.Rect(6, 5, w, h)
     pygame.draw.ellipse(s, col, body)
-    pygame.draw.line(s, (240, 240, 240), (6 + int(w * 0.62), 8), (6 + int(w * 0.62), h + 2), 4)
-    pygame.draw.rect(s, darker(col, 0.7), (6 + int(w * 0.25), cy + h // 3 - 2, w // 3, 6), border_radius=3)
+    if name == "phantom":      # sleek, with camo spots and a red stripe
+        for fx, fy, fr in ((0.3, 0.4, 0.14), (0.55, 0.65, 0.12), (0.75, 0.35, 0.1), (0.45, 0.25, 0.09)):
+            pygame.draw.circle(s, (70, 100, 60), (6 + int(w * fx), 5 + int(h * fy)), int(h * fr * 1.4))
+        pygame.draw.line(s, (220, 50, 50), (6 + int(w * 0.15), cy), (6 + int(w * 0.9), cy), 3)
+    elif name == "colossus":   # dark armor plates
+        for i in range(4):
+            x = 6 + int(w * (0.2 + i * 0.17))
+            pygame.draw.rect(s, (25, 70, 35), (x, 8, int(w * 0.1), h - 6), border_radius=4)
+        pygame.draw.line(s, (240, 240, 240), (6 + int(w * 0.85), 10), (6 + int(w * 0.85), h), 5)
+    elif name == "overlord":   # gold bands and a glowing eye
+        for fx in (0.3, 0.5, 0.7):
+            pygame.draw.line(s, (235, 190, 60), (6 + int(w * fx), 7), (6 + int(w * fx), h + 3), 6)
+        pygame.draw.circle(s, (255, 230, 120), (6 + int(w * 0.86), cy), h // 6)
+        pygame.draw.circle(s, (200, 30, 30), (6 + int(w * 0.86), cy), h // 10)
+    else:
+        pygame.draw.line(s, (240, 240, 240), (6 + int(w * 0.62), 8), (6 + int(w * 0.62), h + 2), 4)
+        pygame.draw.rect(s, darker(col, 0.7), (6 + int(w * 0.25), cy + h // 3 - 2, w // 3, 6), border_radius=3)
     shade_ball(s, 6 + w / 2, 5 + h / 2, w / 2, h / 2)
     pygame.draw.ellipse(s, dark, body, 3)
     cx = s.get_width() // 2
@@ -1703,6 +1741,7 @@ class Game:
         if path is None:   # a new balloon: take turns between the tracks
             path = self.paths[self.spawned % len(self.paths)]
             self.spawned += 1
+        camo = camo or BALLOON_TYPES[name].get("always_camo", False)
         b = Balloon(name, max(0.0, dist), camo, self.next_id, self.hp_mult, path, regrow, fort)
         self.next_id += 1
         b.x, b.y, b.seg = path.pos(b.dist, seg)
@@ -1762,7 +1801,8 @@ class Game:
                 q.append((delay + i * spacing, name, (camo, regrow, fort)))
         q.sort(key=lambda e: e[0])
         self.queue, self.qi, self.rtime = q, 0, 0.0
-        self.hp_mult = 1.0 + max(0, self.round - len(ROUNDS)) * 0.06
+        # big balloons get tougher late: +2% per round after 80, +5% per round after 150
+        self.hp_mult = 1.0 + max(0, self.round - 80) * 0.02 + max(0, self.round - FINAL_ROUND) * 0.03
         self.active = True
         self.auto_wait = 0.0
 
@@ -1790,6 +1830,8 @@ class Game:
         if self.round == WIN_ROUND and not self.won and not self.sandbox:
             self.won = True
             self.overlay, self.over_idx = "win", 0
+        elif self.round == FINAL_ROUND and not self.sandbox:
+            self.overlay, self.over_idx = "champion", 0
         if self.auto:
             self.auto_wait = AUTO_START_DELAY
 
@@ -2018,7 +2060,8 @@ class Game:
         elif aid == "twister":
             for b in on_screen:
                 if (b.x - t.x) ** 2 + (b.y - t.y) ** 2 <= 170 ** 2:
-                    b.dist = max(0.0, b.dist - (40 if b.info.get("blimp") else 130))
+                    if not b.info.get("unstoppable"):
+                        b.dist = max(0.0, b.dist - (40 if b.info.get("blimp") else 130))
             self.add_fx("ring", t.x, t.y, 0.4, (170, (200, 255, 240)))
         elif aid == "hurricane":
             for b in on_screen:
@@ -2046,7 +2089,7 @@ class Game:
             self.add_fx("ring", t.x, t.y, 0.4, (200, (220, 150, 255)))
         elif aid == "gravity_well":
             for b in front[:30]:
-                if b.name != "titan":
+                if b.name not in ("titan", "colossus", "overlord"):
                     b.lift, b.lift_t, b.lift_by = (2.0 if b.info.get("blimp") else 4.0), 0.3, t
 
     def update_tower(self, t, dt):
@@ -2297,6 +2340,8 @@ class Game:
             if not b.alive:
                 continue
             sp = base * b.info["speed"]
+            if b.info.get("unstoppable"):   # the Overlord shrugs off all of these
+                b.frozen = b.slow = b.glue = b.lift = 0.0
             if b.frozen > 0:
                 b.frozen -= dt
                 sp = sp * 0.5 if b.info.get("blimp") else 0.0
@@ -2648,7 +2693,7 @@ class Game:
                     "Send balloons!",
                     "Jump to round: < %d >" % sb["round"],
                     "Pop everything", "Recharge abilities", "Back"]
-        if self.overlay == "win":
+        if self.overlay in ("win", "champion"):
             return ["Keep playing", "Quit to title"]
         return ["Try again", "Quit to title"]
 
@@ -2705,7 +2750,7 @@ class Game:
             elif choice.startswith("Amount"):
                 sb["amount"] = (sb["amount"] + step) % len(SANDBOX_AMOUNTS)
             elif choice.startswith("Jump"):
-                sb["round"] = max(1, min(50, sb["round"] + step))
+                sb["round"] = max(1, min(FINAL_ROUND, sb["round"] + 5 * step if sb["round"] >= 30 else sb["round"] + step))
         if "A" not in inp.pressed:
             return
         if choice == "Send balloons!":
@@ -3049,7 +3094,8 @@ class Game:
             r = img.get_rect(midleft=(236, 21))
             pygame.draw.rect(surf, GREEN, r.inflate(10, 6), border_radius=6)
             surf.blit(img, r)
-        rtxt = "Round %d/%d" % (max(1, self.round), WIN_ROUND) if self.round <= WIN_ROUND \
+        goal = WIN_ROUND if self.round <= WIN_ROUND else FINAL_ROUND
+        rtxt = "Round %d/%d" % (max(1, self.round), goal) if self.round <= FINAL_ROUND \
             else "Round %d" % self.round
         img = app.text(app.f_norm, rtxt, WHITE)
         surf.blit(img, (SCREEN_W - img.get_width() - (16 + 13 * self.speed if self.speed > 1 else 10), 8))
@@ -3220,8 +3266,10 @@ class Game:
             title, sub = "Sandbox Tools", "LEFT/RIGHT: change    A: do it"
         elif self.overlay == "over":
             title, sub = "Game Over", "You made it to round %d" % self.round
+        elif self.overlay == "champion":
+            title, sub = "CHAMPION!", "All %d rounds beaten!" % FINAL_ROUND
         else:
-            title, sub = "You Win!", "All %d rounds beaten!" % WIN_ROUND
+            title, sub = "You Win!", "Round %d beaten! Keep going to %d?" % (WIN_ROUND, FINAL_ROUND)
         items = self.overlay_items()
         top = 190 if len(items) <= 4 else 140 if len(items) <= 6 else 90   # long menus start higher
         img = app.text(app.f_big, title, YELLOW)
@@ -3681,7 +3729,8 @@ class App:
         badge_col = {"Easy": (70, 180, 80), "Medium": (220, 170, 40), "Hard": (210, 70, 60)}[mp["level"]]
         badge = self.text(self.f_small, mp["level"], WHITE)
         best = self.best(self.map_idx, self.diff_idx)
-        info = self.text(self.f_small, ("Best: round %d" % best) + ("  - beaten!" if best >= WIN_ROUND else ""),
+        info = self.text(self.f_small, ("Best: round %d" % best) +
+                         ("  - CHAMPION!" if best >= FINAL_ROUND else "  - beaten!" if best >= WIN_ROUND else ""),
                          (255, 220, 120) if best >= WIN_ROUND else (200, 205, 225))
         total = badge.get_width() + 24 + 14 + info.get_width()
         bx = SCREEN_W // 2 - total // 2
@@ -3859,7 +3908,7 @@ class App:
         ("Ships, subs and sharks go on water.", WHITE),
         ("Lead: bombs, fire or magic. Purple: no magic.", WHITE),
         ("Regrow balloons grow back: finish them!", WHITE),
-        ("The game saves after every round.", WHITE),
+        ("Beat round 150 to be Champion! (autosaves)", WHITE),
     ]
 
     def draw_help(self, surf):

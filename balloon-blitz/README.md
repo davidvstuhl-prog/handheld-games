@@ -28,7 +28,8 @@ emulator in [`../pc-tester`](../pc-tester).
 - **L + R together** (or **D** on a keyboard) opens the **ability bar**.
 - **B** opens the game menu (auto-start, sound slider, **Tower guide**, restart, quit).
   The Tower guide opens on the tower you're looking at; B takes you back to your paused game.
-- Beat **round 30** to win, then keep going in freeplay.
+- Beat **round 30** to win, then keep going: the rounds go all the way to **150**.
+  Beat round 150 (with the Overlord) to become **Champion**, then freeplay continues.
 - **Easy** starts with $850 (instead of $650), slower balloons and cheaper towers.
 - **Sandbox** (pick it as the difficulty) is for testing: endless money and lives, and
   **Sandbox tools** in the B menu let you send any balloon (camo / regrow / fortified, 1-50
@@ -155,6 +156,12 @@ as rounds go by. They unlock two abilities as they level up.
 - **Fortified** (metal band): armored lead, ceramics and blimps that take twice the hits.
 - **Ceramic**: takes 10 hits.
 - **Blimp** (round 25) and **Titan** (round 30): giant bosses with health bars.
+- **Phantom** (from round 45): a fast, dark blimp that is **always camo** and immune to
+  darts/tacks **and** explosions. Use magic, fire, normal-damage upgrades or bites.
+- **Colossus** (from round 50): a huge armored blimp (2,000 health) that drops 4 Titans.
+- **Overlord** (rounds 100, 125 and 150): the final boss, 15,000 health. It **can't be
+  frozen, slowed, glued, pushed back or lifted**, and it drops 2 Colossi and 3 Phantoms.
+  You'll need a defense full of tier 5 towers to beat round 150.
 
 ## Run it on the handheld
 
