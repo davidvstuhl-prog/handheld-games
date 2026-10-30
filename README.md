@@ -5,7 +5,7 @@ Games for my homemade Raspberry Pi calculator handheld: Pi Zero 2 W,
 
 | Folder | What's inside |
 |---|---|
-| [`balloon-blitz/`](balloon-blitz) | **Balloon Blitz**, a balloon-popping tower defense game (like Bloons TD 6): 16 towers, 5 heroes, abilities, 8 maps |
+| [`balloon-blitz/`](balloon-blitz) | **Balloon Blitz**, a balloon-popping tower defense game: 16 towers, 5 heroes, abilities, 8 maps |
 | [`pc-tester/`](pc-tester) | A handheld emulator, so you can test the games on a computer |
 | [`ti84-ce/`](ti84-ce) | **Balloon Blitz CE**, a smaller version for the TI-84 Plus CE calculator (C) |
 

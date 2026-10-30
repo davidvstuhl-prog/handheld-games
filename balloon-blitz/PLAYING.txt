@@ -9,6 +9,13 @@ HOW TO START
            (first time: right-click it, choose "Open", then "Open" again)
   Linux:   run ./BalloonBlitz
 
+MOUSE
+  Click a tower in the shop, then click the map to build it.
+  Click a tower to upgrade it, sell it or change its target.
+  Top-right buttons: start round / pause, speed (1x 2x 3x), menu.
+  Click the round ability buttons to use abilities.
+  Right-click cancels / goes back. The mouse wheel scrolls.
+
 KEYBOARD
   Arrow keys .... move the cursor / choose in menus
   Z (or Space) .. A: build, open a tower's menu, OK

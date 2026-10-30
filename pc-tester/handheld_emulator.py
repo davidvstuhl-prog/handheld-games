@@ -64,12 +64,22 @@ class EmulatorApp(bb.App):
         self.mouse_btn = None
 
     def on_event(self, e):
+        screen = pygame.Rect(SCREEN_X, SCREEN_Y, bb.SCREEN_W, bb.SCREEN_H)
+        if e.type == pygame.MOUSEWHEEL:
+            self.inp.mouse_event(e)
+            return True
         # Holding the mouse on a button = holding that button down.
         if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
             for act, (shape, geom, _, _) in BUTTONS.items():
                 if hit(shape, geom, e.pos):
                     self.mouse_btn = act
                     self.inp.virtual = {act}
+                    return True
+        # Anything on the game screen itself goes to the game, like in the PC version.
+        if e.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN) and screen.collidepoint(e.pos):
+            self.inp.mouse_event(e, (SCREEN_X, SCREEN_Y))
+            return True
+        if e.type == pygame.MOUSEBUTTONDOWN:
             return True
         if e.type == pygame.MOUSEBUTTONUP and e.button == 1:
             self.mouse_btn = None

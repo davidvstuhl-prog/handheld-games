@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v5.0 (150 rounds, modifiers, achievements)"
+VERSION = "v5.1 (mouse support)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -119,6 +119,13 @@ BALLOON_TYPES = {
                      unstoppable=True),
 }
 BALLOON_ORDER = list(BALLOON_TYPES)   # used for "Strong" targeting
+BALLOON_LABELS = {"lead": "Iron", "ceramic": "Clay", "zebra": "Striped", "rainbow": "Prism",
+                  "purple": "Violet"}
+
+
+def balloon_label(name):
+    """The name players see for a balloon type."""
+    return BALLOON_LABELS.get(name, name.capitalize())
 for _info in BALLOON_TYPES.values():
     _info.setdefault("immune", set())
 
@@ -133,7 +140,7 @@ MODIFIERS = {
     "Normal": [("none", "No modifier", "Play normally"),
                ("few_upgrades", "Few Upgrades", "Max 4 upgrades per tower"),
                ("tier3", "Tier 3 Max", "Upgrades stop at tier 3"),
-               ("classic6", "Classic Six", "Only the original 6 towers")],
+               ("classic6", "Classic Six", "Only the first 6 towers")],
     "Hard": [("none", "No modifier", "Play normally"),
              ("hardcore", "Hardcore", "Only 1 life"),
              ("cash50", "Half Cash", "You earn 50% of the money"),
@@ -183,8 +190,8 @@ ACHIEVEMENTS = [
 ACH_BY_ID = {a[0]: a for a in ACHIEVEMENTS}
 
 # Sandbox tools: balloon kinds you can send, and how many at once.
-SANDBOX_FLAGS = [("Normal", ""), ("Camo", "c"), ("Regrow", "r"), ("Fortified", "f"),
-                 ("Camo + Regrow", "cr"), ("Camo + Fortified", "cf")]
+SANDBOX_FLAGS = [("Normal", ""), ("Camo", "c"), ("Healing", "r"), ("Armored", "f"),
+                 ("Camo + Healing", "cr"), ("Camo + Armored", "cf")]
 SANDBOX_AMOUNTS = [1, 5, 10, 25, 50]
 
 # Regrow balloons grow back one layer at a time along this chain.
@@ -210,93 +217,93 @@ for _n in BALLOON_TYPES:
 # tower's stats: ("+", n) adds, ("*", n) multiplies, ("=", v) sets.
 # Upgrade rule: each path goes up to 3, but only ONE path can reach 3.
 TOWER_TYPES = [
-    dict(key="dart", name="Dart Tower", cost=170,
-         desc="Throws darts at one balloon",
+    dict(key="dart", name="Crossbow Post", cost=170,
+         desc="Throws bolts at one balloon",
          base=dict(range=130, rate=0.8, dmg=1, pierce=2, speed=540,
                    dtype="sharp", count=1, spread=0.0),
          paths=[
-             [("Sharp Darts", 120, "Darts pop 1 more balloon", {"pierce": ("+", 1)}),
-              ("Triple Shot", 340, "Throws 3 darts at once",
+             [("Keen Bolts", 120, "Bolts pop 1 more balloon", {"pierce": ("+", 1)}),
+              ("Trio Volley", 340, "Throws 3 bolts at once",
                {"count": ("=", 3), "spread": ("=", 0.22)}),
               ("Spike Ball", 1100, "Rolls a huge spiked ball, bounces once",
                {"spikeball": ("=", True), "count": ("=", 1), "rate": ("*", 1.5)})],
-             [("Long Range", 75, "+30 range", {"range": ("+", 30)}),
-              ("Eagle Eye", 135, "Can see camo balloons",
+             [("Far Sight", 75, "+30 range", {"range": ("+", 30)}),
+              ("Hawk Lens", 135, "Can see camo balloons",
                {"camo": ("=", True), "range": ("+", 15)}),
-              ("Rapid Fire", 425, "Throws twice as fast", {"rate": ("*", 0.5)})],
+              ("Quick Crank", 425, "Throws twice as fast", {"rate": ("*", 0.5)})],
          ]),
-    dict(key="tack", name="Tack Shooter", cost=280,
-         desc="Fires tacks in every direction",
+    dict(key="tack", name="Needle Dome", cost=280,
+         desc="Fires needles in every direction",
          base=dict(range=95, rate=0.9, dmg=1, pierce=1, speed=380,
                    dtype="sharp", count=12),
          paths=[
              [("Quick Spin", 150, "Shoots 20% faster", {"rate": ("*", 0.8)}),
               ("Faster Spin", 260, "Shoots 25% faster", {"rate": ("*", 0.75)}),
-              ("Blade Ring", 750, "8 more blades, each pops 3",
+              ("Razor Halo", 750, "8 more blades, each pops 3",
                {"count": ("+", 8), "pierce": ("+", 2)})],
              [("Long Reach", 100, "+15 range", {"range": ("+", 15)}),
-              ("More Tacks", 250, "+4 tacks per shot", {"count": ("+", 4)}),
-              ("Ring of Fire", 1100, "Fire: 2 damage, pops lead",
+              ("More Needles", 250, "+4 needles per shot", {"count": ("+", 4)}),
+              ("Flame Halo", 1100, "Fire: 2 damage, pops iron",
                {"dtype": ("=", "magic"), "dmg": ("+", 1)})],
          ]),
-    dict(key="boom", name="Boomerang", cost=325,
+    dict(key="boom", name="Rang Hut", cost=325,
          desc="Curved throw that comes back",
          base=dict(range=120, rate=1.15, dmg=1, pierce=5, speed=360,
                    dtype="sharp", count=1, knock=0),
          paths=[
              [("Wide Arc", 250, "Boomerangs pop 4 more", {"pierce": ("+", 4)}),
-              ("Hot Rang", 450, "Red-hot: pops lead", {"dtype": ("=", "normal")}),
+              ("Molten Rang", 450, "Red-hot: pops iron", {"dtype": ("=", "normal")}),
               ("Blade Storm", 1500, "+10 pierce, +2 damage",
                {"pierce": ("+", 10), "dmg": ("+", 2)})],
              [("Quick Throw", 200, "Throws 25% faster", {"rate": ("*", 0.75)}),
-              ("Double Throw", 500, "Throws 2 boomerangs", {"count": ("=", 2)}),
+              ("Twin Throw", 500, "Throws 2 boomerangs", {"count": ("=", 2)}),
               ("Push Back", 1300, "Hits knock balloons back",
                {"knock": ("=", 18), "rate": ("*", 0.8)})],
          ]),
-    dict(key="bomb", name="Bomb Tower", cost=500,
-         desc="Explodes groups. Pops lead",
+    dict(key="bomb", name="Mortar", cost=500,
+         desc="Explodes groups. Pops iron",
          base=dict(range=145, rate=1.35, dmg=1, pierce=18, speed=400,
                    dtype="explode", blast=50, cluster=0, blimp_mult=1),
          paths=[
-             [("Bigger Bombs", 250, "Bigger explosions", {"blast": ("+", 20)}),
-              ("Heavy Bombs", 450, "+1 damage", {"dmg": ("+", 1)}),
+             [("Wide Shells", 250, "Bigger explosions", {"blast": ("+", 20)}),
+              ("Dense Shells", 450, "+1 damage", {"dmg": ("+", 1)}),
               ("Blimp Buster", 1100, "+2 damage, 3x vs blimps",
                {"dmg": ("+", 2), "blimp_mult": ("=", 3)})],
              [("Long Fuse", 200, "+25 range", {"range": ("+", 25)}),
               ("Radar Reload", 350, "25% faster, sees camo",
                {"rate": ("*", 0.75), "camo": ("=", True)}),
-              ("Cluster Bombs", 900, "Blasts throw 6 mini bombs", {"cluster": ("=", 6)})],
+              ("Scatter Shells", 900, "Blasts throw 6 mini bombs", {"cluster": ("=", 6)})],
          ]),
-    dict(key="glue", name="Glue Gunner", cost=200,
-         desc="Glue slows balloons down",
+    dict(key="glue", name="Goo Tank", cost=200,
+         desc="Goo slows balloons down",
          base=dict(range=115, rate=0.7, pierce=1, speed=380, slow=0.5, glue_time=11,
                    acid=0, splash=0, glue_blimp=False, count=1, spread=0.0),
          paths=[
-             [("Sticky Glue", 150, "Slows more, lasts longer",
+             [("Thick Goo", 150, "Slows more, lasts longer",
                {"slow": ("=", 0.65), "glue_time": ("+", 4)}),
-              ("Acid Glue", 340, "Glue pops a layer every 1.5s", {"acid": ("=", 1.5)}),
+              ("Acid Goo", 340, "Goo pops a layer every 1.5s", {"acid": ("=", 1.5)}),
               ("Melting Goo", 1650, "Fast acid, works on blimps",
                {"acid": ("=", 0.4), "glue_blimp": ("=", True)})],
-             [("Glue Spray", 165, "Glue hits 2 more balloons", {"pierce": ("+", 2)}),
+             [("Goo Spray", 165, "Goo hits 2 more balloons", {"pierce": ("+", 2)}),
               ("Fast Squirt", 300, "Shoots 40% faster", {"rate": ("*", 0.6)}),
-              ("Glue Storm", 1200, "Glue splashes a whole area",
+              ("Goo Burst", 1200, "Goo splashes a whole area",
                {"splash": ("=", 60), "glue_blimp": ("=", True)})],
          ]),
-    dict(key="frost", name="Frost Tower", cost=350,
+    dict(key="frost", name="Frost Spire", cost=350,
          desc="Freezes nearby balloons",
          base=dict(range=80, rate=2.2, dmg=0, freeze=1.2, slow_after=0,
                    freeze_white=False),
          paths=[
-             [("Deep Freeze", 150, "Freezes for longer", {"freeze": ("+", 0.6)}),
+             [("Hard Freeze", 150, "Freezes for longer", {"freeze": ("+", 0.6)}),
               ("Shatter", 320, "Freezing also pops 1 layer", {"dmg": ("+", 1)}),
-              ("Arctic Wind", 800, "+40 range, freezes longer",
+              ("Polar Gust", 800, "+40 range, freezes longer",
                {"range": ("+", 40), "freeze": ("+", 0.4)})],
              [("Wide Chill", 120, "+20 range", {"range": ("+", 20)}),
-              ("Permafrost", 250, "Slows balloons after thaw", {"slow_after": ("=", 3.0)}),
-              ("Cold Snap", 500, "Freezes white+zebra, sees camo",
+              ("Lingering Chill", 250, "Slows balloons after thaw", {"slow_after": ("=", 3.0)}),
+              ("Snap Frost", 500, "Freezes white+striped, sees camo",
                {"freeze_white": ("=", True), "camo": ("=", True)})],
          ]),
-    dict(key="ninja", name="Ninja", cost=400,
+    dict(key="ninja", name="Shadow Dojo", cost=400,
          desc="Fast stars. Sees camo",
          base=dict(range=125, rate=0.55, dmg=1, pierce=2, speed=620, dtype="sharp",
                    camo=True, count=1, spread=0.0, homing=False, stun=0),
@@ -310,69 +317,69 @@ TOWER_TYPES = [
               ("Shadow Master", 2600, "+3 damage, throws faster",
                {"dmg": ("+", 3), "rate": ("*", 0.7)})],
          ]),
-    dict(key="sniper", name="Sniper", cost=350,
+    dict(key="sniper", name="Marksman Nest", cost=350,
          desc="Hits anything on the map",
          base=dict(range=9999, rate=1.6, dmg=2, dtype="sharp", blimp_mult=1),
          paths=[
-             [("Full Metal", 350, "4 damage, pops lead",
+             [("Steel Core", 350, "4 damage, pops iron",
                {"dmg": ("=", 4), "dtype": ("=", "normal")}),
-              ("Large Calibre", 1000, "7 damage", {"dmg": ("=", 7)}),
-              ("Deadeye", 2500, "18 damage, 4x vs blimps",
+              ("Big Bore", 1000, "7 damage", {"dmg": ("=", 7)}),
+              ("True Aim", 2500, "18 damage, 4x vs blimps",
                {"dmg": ("=", 18), "blimp_mult": ("=", 4)})],
-             [("Night Scope", 300, "Can see camo balloons", {"camo": ("=", True)}),
-              ("Fast Bolt", 400, "Shoots 40% faster", {"rate": ("*", 0.6)}),
-              ("Semi-Auto", 2800, "Shoots 3x faster", {"rate": ("*", 0.33)})],
+             [("Dark Lens", 300, "Can see camo balloons", {"camo": ("=", True)}),
+              ("Quick Bolt", 400, "Shoots 40% faster", {"rate": ("*", 0.6)}),
+              ("Auto Loader", 2800, "Shoots 3x faster", {"rate": ("*", 0.33)})],
          ]),
-    dict(key="wizard", name="Wizard", cost=320,
+    dict(key="wizard", name="Arcane Tower", cost=320,
          desc="Magic pops every balloon type",
          base=dict(range=120, rate=1.1, dmg=1, pierce=3, speed=330,
                    dtype="magic", homing=False, chain=0, breath=False),
          paths=[
-             [("Arcane Blast", 240, "Magic does 1 more damage", {"dmg": ("+", 1)}),
-              ("Arcane Mastery", 560, "Casts faster, pops 2 more",
+             [("Rune Bolt", 240, "Magic does 1 more damage", {"dmg": ("+", 1)}),
+              ("Rune Mastery", 560, "Casts faster, pops 2 more",
                {"rate": ("*", 0.6), "pierce": ("+", 2)}),
-              ("Lightning Bolt", 1280, "Lightning jumps to 8 balloons", {"chain": ("=", 8)})],
-             [("Guided Magic", 200, "Magic bolts chase balloons", {"homing": ("=", True)}),
-              ("Wizard Sight", 240, "Sees camo, +20 range",
+              ("Chain Spark", 1280, "Lightning jumps to 8 balloons", {"chain": ("=", 8)})],
+             [("Seeking Runes", 200, "Magic bolts chase balloons", {"homing": ("=", True)}),
+              ("True Sight", 240, "Sees camo, +20 range",
                {"camo": ("=", True), "range": ("+", 20)}),
-              ("Dragon's Breath", 1040, "Adds a flamethrower", {"breath": ("=", True)})],
+              ("Fire Wyrm", 1040, "Adds a flamethrower", {"breath": ("=", True)})],
          ]),
-    dict(key="spike", name="Spike Factory", cost=650,
+    dict(key="spike", name="Spike Press", cost=650,
          desc="Drops spikes on the track",
          base=dict(range=95, rate=2.0, dmg=1, pierce=5, dtype="sharp", life=25, mines=False),
          paths=[
              [("Bigger Piles", 300, "Piles pop 4 more", {"pierce": ("+", 4)}),
-              ("Hot Spikes", 550, "+1 damage, pops lead",
+              ("Hot Spikes", 550, "+1 damage, pops iron",
                {"dmg": ("+", 1), "dtype": ("=", "normal")}),
-              ("Spike Mines", 1800, "Used-up piles explode", {"mines": ("=", True)})],
+              ("Blast Spikes", 1800, "Used-up piles explode", {"mines": ("=", True)})],
              [("Long-lasting", 250, "Spikes last twice as long", {"life": ("*", 2)}),
               ("Faster Making", 700, "Makes spikes 40% faster", {"rate": ("*", 0.6)}),
-              ("Spike Storm", 2500, "Makes spikes 3x faster", {"rate": ("*", 0.35)})],
+              ("Spike Flurry", 2500, "Makes spikes 3x faster", {"rate": ("*", 0.35)})],
          ]),
-    dict(key="village", name="Village", cost=900,
+    dict(key="village", name="Camp", cost=900,
          desc="Boosts towers in its circle",
          base=dict(range=115, boost=0.1, radar=False, drums=0, rune=False, discount=0, income=0),
          paths=[
-             [("Radar Hut", 400, "Towers in circle see camo", {"radar": ("=", True)}),
+             [("Lookout Post", 400, "Towers in circle see camo", {"radar": ("=", True)}),
               ("Drum Circle", 900, "Towers in circle 15% faster", {"drums": ("=", 0.15)}),
-              ("Ancient Rune", 2200, "Towers in circle pop lead+black", {"rune": ("=", True)})],
+              ("Ancient Rune", 2200, "Towers in circle pop iron+black", {"rune": ("=", True)})],
              [("Watchtower", 250, "Bigger circle, +20% range",
                {"range": ("+", 30), "boost": ("=", 0.2)}),
               ("Trade Post", 500, "15% off in the circle", {"discount": ("=", 0.15)}),
               ("Gold Market", 2500, "+$300 every round", {"income": ("=", 300)})],
          ]),
-    dict(key="super", name="Super Tower", cost=2200,
-         desc="A storm of darts. Pricey!",
+    dict(key="super", name="Star Core", cost=2200,
+         desc="A storm of bolts. Pricey!",
          base=dict(range=150, rate=0.08, dmg=1, pierce=1, speed=700, dtype="sharp",
                    count=1, spread=0.0, blimp_mult=1),
          paths=[
-             [("Laser Vision", 1500, "+1 pierce, 15% faster",
+             [("Beam Focus", 1500, "+1 pierce, 15% faster",
                {"pierce": ("+", 1), "rate": ("*", 0.85)}),
-              ("Plasma Core", 3500, "+1 damage, pops lead",
+              ("Plasma Heart", 3500, "+1 damage, pops iron",
                {"dmg": ("+", 1), "dtype": ("=", "magic")}),
               ("Solar Flare", 11000, "3 beams, +2 damage, +3 pierce",
                {"count": ("=", 3), "spread": ("=", 0.15), "dmg": ("+", 2), "pierce": ("+", 3)})],
-             [("Night Goggles", 600, "Sees camo balloons", {"camo": ("=", True)}),
+             [("Night Lens", 600, "Sees camo balloons", {"camo": ("=", True)}),
               ("Twin Blasters", 3000, "Shoots 2 at once",
                {"count": ("=", 2), "spread": ("=", 0.12)}),
               ("Blimp Wrecker", 6000, "4x damage to blimps", {"blimp_mult": ("=", 4)})],
@@ -391,24 +398,24 @@ TOWER_TYPES = [
 ]
 # Water towers: can only be built on water.
 TOWER_TYPES += [
-    dict(key="pirate", name="Pirate Ship", cost=450, water=True,
+    dict(key="pirate", name="Galleon", cost=450, water=True,
          desc="Cannonballs, 2 at a time (water)",
          base=dict(range=125, rate=1.0, dmg=1, pierce=4, speed=420, dtype="sharp",
                    count=2, spread=0.14),
          paths=[
-             [("Grapeshot", 220, "Cannonballs pop 2 more", {"pierce": ("+", 2)}),
+             [("Chain Shot", 220, "Cannonballs pop 2 more", {"pierce": ("+", 2)}),
               ("Double Deck", 450, "4 cannonballs per shot", {"count": ("=", 4), "spread": ("=", 0.12)}),
-              ("Iron Balls", 1300, "+2 damage, pops lead", {"dmg": ("+", 2), "dtype": ("=", "normal")})],
-             [("Crow's Nest", 200, "+25 range, sees camo", {"range": ("+", 25), "camo": ("=", True)}),
+              ("Iron Balls", 1300, "+2 damage, pops iron", {"dmg": ("+", 2), "dtype": ("=", "normal")})],
+             [("Lookout Mast", 200, "+25 range, sees camo", {"range": ("+", 25), "camo": ("=", True)}),
               ("Cargo Hold", 500, "+$60 every round", {"income": ("=", 60)}),
               ("Treasure Fleet", 1500, "+$260 every round", {"income": ("=", 260)})],
          ]),
-    dict(key="sub", name="Submarine", cost=350, water=True,
+    dict(key="sub", name="Torpedo Sub", cost=350, water=True,
          desc="Fires torpedoes (water)",
          base=dict(range=135, rate=0.9, dmg=1, pierce=2, speed=460, dtype="sharp",
                    count=1, spread=0.0, homing=False),
          paths=[
-             [("Heavy Torpedo", 250, "+1 damage, pops lead", {"dmg": ("+", 1), "dtype": ("=", "normal")}),
+             [("Heavy Torpedo", 250, "+1 damage, pops iron", {"dmg": ("+", 1), "dtype": ("=", "normal")}),
               ("Homing Torpedo", 450, "Torpedoes chase balloons", {"homing": ("=", True)}),
               ("Torpedo Spread", 1400, "3 torpedoes, +2 pierce",
                {"count": ("=", 3), "spread": ("=", 0.2), "pierce": ("+", 2)})],
@@ -416,7 +423,7 @@ TOWER_TYPES += [
               ("Periscope", 300, "+30 range", {"range": ("+", 30)}),
               ("Blimp Hunter", 1500, "4x damage to blimps", {"blimp_mult": ("=", 4)})],
          ]),
-    dict(key="shark", name="Shark", cost=400, water=True,
+    dict(key="shark", name="Reef Shark", cost=400, water=True,
          desc="Bites nearby balloons hard (water)",
          base=dict(range=90, rate=0.9, dmg=2, pierce=3, dtype="sharp", camo=False, knock=0),
          paths=[
@@ -435,19 +442,19 @@ WATER_KEYS = ("pirate", "sub", "shark")
 MIDDLE_PATHS = {
     "dart": [("Quick Draw", 150, "Throws 15% faster", {"rate": ("*", 0.85)}),
              ("Keen Eye", 250, "+20 range, pops 1 more", {"range": ("+", 20), "pierce": ("+", 1)}),
-             ("Dart Storm", 900, "Ability: 4x faster for 6s", {"ability": ("=", "dart_storm")})],
+             ("Bolt Storm", 900, "Ability: 4x faster for 6s", {"ability": ("=", "dart_storm")})],
     "tack": [("Hot Coils", 180, "Shoots 15% faster", {"rate": ("*", 0.85)}),
-             ("Sharper Tacks", 300, "Tacks pop 1 more", {"pierce": ("+", 1)}),
-             ("Tack Nova", 1000, "Ability: 48-tack blast", {"ability": ("=", "tack_nova")})],
+             ("Sharper Needles", 300, "Needles pop 1 more", {"pierce": ("+", 1)}),
+             ("Needle Nova", 1000, "Ability: 48-needle blast", {"ability": ("=", "tack_nova")})],
     "boom": [("Light Rangs", 180, "Throws 15% faster", {"rate": ("*", 0.85)}),
              ("Spin Edge", 350, "Boomerangs pop 3 more", {"pierce": ("+", 3)}),
              ("Rang Barrage", 1100, "Ability: 12 boomerangs", {"ability": ("=", "rang_barrage")})],
     "bomb": [("Short Fuse", 220, "Shoots 15% faster", {"rate": ("*", 0.85)}),
              ("Shrapnel", 380, "Bigger blasts", {"blast": ("+", 15)}),
              ("Carpet Bomb", 1300, "Ability: bomb the front line", {"ability": ("=", "carpet_bomb")})],
-    "glue": [("Thick Glue", 150, "Glue lasts longer", {"glue_time": ("+", 4)}),
+    "glue": [("Lasting Goo", 150, "Goo lasts longer", {"glue_time": ("+", 4)}),
              ("Wide Nozzle", 280, "+20 range", {"range": ("+", 20)}),
-             ("Glue Rain", 900, "Ability: glue everything", {"ability": ("=", "glue_rain")})],
+             ("Goo Rain", 900, "Ability: goo everything", {"ability": ("=", "glue_rain")})],
     "frost": [("Cold Core", 160, "Pulses 15% faster", {"rate": ("*", 0.85)}),
               ("Big Chill", 320, "+15 range", {"range": ("+", 15)}),
               ("Blizzard", 1100, "Ability: freeze everything", {"ability": ("=", "blizzard")})],
@@ -464,7 +471,7 @@ MIDDLE_PATHS = {
               ("Quick Press", 450, "Makes spikes 20% faster", {"rate": ("*", 0.8)}),
               ("Spike Carpet", 1300, "Ability: spike the track", {"ability": ("=", "spike_carpet")})],
     "village": [("Big Square", 300, "Bigger circle", {"range": ("+", 25)}),
-                ("Training Yard", 600, "+10% more range boost", {"boost": ("+", 0.1)}),
+                ("Drill Field", 600, "+10% more range boost", {"boost": ("+", 0.1)}),
                 ("Rally Cry", 2000, "Ability: all towers 2x speed", {"ability": ("=", "rally_cry")})],
     "super": [("Hyper Core", 1800, "Shoots 15% faster", {"rate": ("*", 0.85)}),
               ("Laser Lens", 3000, "+2 pierce", {"pierce": ("+", 2)}),
@@ -476,7 +483,7 @@ MIDDLE_PATHS = {
             ("Twin Tubes", 450, "2 torpedoes per shot", {"count": ("=", 2), "spread": ("=", 0.15)}),
             ("Depth Charge", 1300, "Ability: blasts the front", {"ability": ("=", "depth_charge")})],
     "shark": [("Fast Fins", 250, "Bites 15% faster", {"rate": ("*", 0.85)}),
-              ("Hungry", 450, "Bites pop lead", {"dtype": ("=", "normal")}),
+              ("Hungry", 450, "Bites pop iron", {"dtype": ("=", "normal")}),
               ("Feeding Frenzy", 1300, "Ability: 3x bites for 8s", {"ability": ("=", "feeding_frenzy")})],
     "mine": [("Bigger Carts", 350, "+30 money per round", {"income": ("+", 30)}),
              ("Coin Polish", 600, "+60 money per round", {"income": ("+", 60)}),
@@ -492,12 +499,12 @@ for _tt in TOWER_TYPES:
 # Middle path, tiers 3-5: tier 3 is a stat boost, tier 4 UNLOCKS the
 # ability, tier 5 powers the ability up ("ab_power").
 MIDDLE_TOP = {
-    "dart": [("Piercing Darts", 900, "+2 pierce, 15% faster", {"pierce": ("+", 2), "rate": ("*", 0.85)}),
-             ("Dart Storm", 2800, "Ability: 4x faster for 6s", {"ability": ("=", "dart_storm"), "rate": ("*", 0.8)}),
-             ("Eye of the Storm", 12000, "Huge Dart Storm, 3 darts",
+    "dart": [("Piercing Bolts", 900, "+2 pierce, 15% faster", {"pierce": ("+", 2), "rate": ("*", 0.85)}),
+             ("Bolt Storm", 2800, "Ability: 4x faster for 6s", {"ability": ("=", "dart_storm"), "rate": ("*", 0.8)}),
+             ("Eye of the Storm", 12000, "Huge Bolt Storm, 3 bolts",
               {"ab_power": ("+", 1), "dmg": ("+", 2), "count": ("=", 3), "rate": ("*", 0.6)})],
-    "tack": [("Tack Overload", 1000, "+4 tacks, 15% faster", {"count": ("+", 4), "rate": ("*", 0.85)}),
-             ("Tack Nova", 3000, "Ability: 48-tack blast", {"ability": ("=", "tack_nova"), "pierce": ("+", 2)}),
+    "tack": [("Needle Overload", 1000, "+4 needles, 15% faster", {"count": ("+", 4), "rate": ("*", 0.85)}),
+             ("Needle Nova", 3000, "Ability: 48-needle blast", {"ability": ("=", "tack_nova"), "pierce": ("+", 2)}),
              ("Supernova", 12000, "Massive Tack Nova, +2 dmg", {"ab_power": ("+", 1), "dmg": ("+", 2), "rate": ("*", 0.6)})],
     "boom": [("Return Spin", 1100, "Pops 4 more, 15% faster", {"pierce": ("+", 4), "rate": ("*", 0.85)}),
              ("Rang Barrage", 3000, "Ability: 12 boomerangs", {"ability": ("=", "rang_barrage"), "rate": ("*", 0.85)}),
@@ -507,9 +514,9 @@ MIDDLE_TOP = {
              ("Carpet Bomb", 3500, "Ability: bomb the front line", {"ability": ("=", "carpet_bomb"), "rate": ("*", 0.85)}),
              ("Firestorm Fleet", 14000, "Huge Carpet Bomb, +3 dmg",
               {"ab_power": ("+", 1), "dmg": ("+", 3), "blast": ("+", 20)})],
-    "glue": [("Quick Glue", 900, "Shoots 30% faster", {"rate": ("*", 0.7)}),
-             ("Glue Rain", 2800, "Ability: glue everything", {"ability": ("=", "glue_rain")}),
-             ("Glue Flood", 10000, "Glue Rain melts balloons",
+    "glue": [("Quick Goo", 900, "Shoots 30% faster", {"rate": ("*", 0.7)}),
+             ("Goo Rain", 2800, "Ability: goo everything", {"ability": ("=", "glue_rain")}),
+             ("Goo Flood", 10000, "Goo Rain melts balloons",
               {"ab_power": ("+", 1), "acid": ("=", 0.5), "pierce": ("+", 3)})],
     "frost": [("Deep Cold", 1100, "Freezes longer, +15 range", {"freeze": ("+", 0.5), "range": ("+", 15)}),
               ("Blizzard", 3000, "Ability: freeze everything", {"ability": ("=", "blizzard")}),
@@ -518,10 +525,10 @@ MIDDLE_TOP = {
               ("Smoke Bomb", 3200, "Ability: knock all back", {"ability": ("=", "smoke_bomb")}),
               ("Phantom Clan", 12000, "Huge Smoke Bomb, 3 stars",
                {"ab_power": ("+", 1), "count": ("=", 3), "dmg": ("+", 2)})],
-    "sniper": [("Marksman", 1400, "+2 damage, 15% faster", {"dmg": ("+", 2), "rate": ("*", 0.85)}),
+    "sniper": [("Steady Hands", 1400, "+2 damage, 15% faster", {"dmg": ("+", 2), "rate": ("*", 0.85)}),
                ("Cash Crate", 3500, "Ability: drops $300", {"ability": ("=", "cash_crate")}),
                ("Gold Convoy", 14000, "Bigger crates, +$400/round", {"ab_power": ("+", 1), "income": ("=", 400)})],
-    "wizard": [("Arcane Focus", 1400, "+1 damage, pops 2 more", {"dmg": ("+", 1), "pierce": ("+", 2)}),
+    "wizard": [("Rune Focus", 1400, "+1 damage, pops 2 more", {"dmg": ("+", 1), "pierce": ("+", 2)}),
                ("Meteor", 4000, "Ability: huge blast", {"ability": ("=", "meteor")}),
                ("Starfall", 15000, "Many huge meteors", {"ab_power": ("+", 1), "pierce": ("+", 5), "rate": ("*", 0.6)})],
     "spike": [("Spiky Steel", 1300, "Piles pop 4 more", {"pierce": ("+", 4)}),
@@ -555,17 +562,17 @@ TIERS_4_5 = {
          ("Doom Boulder", 14000, "Crushes 250, bounces 4 times",
           {"ball_pierce": ("=", 250), "ball_dmg": ("=", 12), "ball_bounces": ("=", 4),
            "blimp_mult": ("=", 3), "rate": ("*", 0.7)})],
-        [("Dart Gunner", 2600, "Throws twice as fast", {"rate": ("*", 0.5), "pierce": ("+", 1)}),
-         ("Dart Hurricane", 11000, "Blinding speed, +2 damage",
+        [("Bolt Gunner", 2600, "Throws twice as fast", {"rate": ("*", 0.5), "pierce": ("+", 1)}),
+         ("Bolt Hurricane", 11000, "Blinding speed, +2 damage",
           {"rate": ("*", 0.4), "dmg": ("+", 2), "pierce": ("+", 3), "blimp_mult": ("=", 2)})],
     ],
     "tack": [
         [("Blade Cyclone", 2800, "Spins much faster", {"rate": ("*", 0.6), "pierce": ("+", 3)}),
          ("Razor Tempest", 13000, "16 more blades, +3 damage",
           {"count": ("+", 16), "dmg": ("+", 3), "rate": ("*", 0.6), "dtype": ("=", "normal")})],
-        [("Inferno Ring", 3500, "+2 fire damage, faster",
+        [("Blaze Crown", 3500, "+2 fire damage, faster",
           {"dmg": ("+", 2), "rate": ("*", 0.7), "range": ("+", 15)}),
-         ("Sun Ring", 15000, "+5 damage, burns blimps",
+         ("Solar Crown", 15000, "+5 damage, burns blimps",
           {"dmg": ("+", 5), "rate": ("*", 0.5), "pierce": ("+", 5), "blimp_mult": ("=", 2)})],
     ],
     "boom": [
@@ -582,16 +589,16 @@ TIERS_4_5 = {
           {"dmg": ("+", 5), "blimp_mult": ("=", 5), "pierce": ("+", 15), "rate": ("*", 0.85)}),
          ("Sky Shatter", 16000, "+15 dmg, hits 40 more, 8x blimps",
           {"dmg": ("+", 15), "blimp_mult": ("=", 8), "blast": ("+", 20), "pierce": ("+", 40), "rate": ("*", 0.7)})],
-        [("Mega Clusters", 3000, "12 mini bombs, bigger blasts",
+        [("Mega Scatter", 3000, "12 mini bombs, bigger blasts",
           {"cluster": ("=", 12), "dmg": ("+", 1), "blast": ("+", 10), "pierce": ("+", 10)}),
-         ("Bomb Cascade", 13000, "20 mini bombs, much faster",
+         ("Shell Cascade", 13000, "20 mini bombs, much faster",
           {"cluster": ("=", 20), "dmg": ("+", 3), "rate": ("*", 0.6), "pierce": ("+", 25)})],
     ],
     "glue": [
-        [("Corrosive Goo", 3200, "Acid 6x faster, slows more", {"acid": ("=", 0.25), "slow": ("=", 0.75)}),
+        [("Caustic Goo", 3200, "Acid 6x faster, slows more", {"acid": ("=", 0.25), "slow": ("=", 0.75)}),
          ("Meltdown", 12000, "Acid melts layers nonstop", {"acid": ("=", 0.1), "pierce": ("+", 4)})],
-        [("Glue Typhoon", 3000, "Much bigger splash", {"splash": ("+", 40), "rate": ("*", 0.7)}),
-         ("Amber Trap", 11000, "Glue almost stops balloons",
+        [("Goo Typhoon", 3000, "Much bigger splash", {"splash": ("+", 40), "rate": ("*", 0.7)}),
+         ("Amber Trap", 11000, "Goo almost stops balloons",
           {"splash": ("+", 60), "slow": ("=", 0.9), "glue_time": ("+", 8)})],
     ],
     "frost": [
@@ -619,14 +626,14 @@ TIERS_4_5 = {
     ],
     "wizard": [
         [("Storm Caller", 3500, "Lightning hits 16, +2 dmg", {"chain": ("=", 16), "dmg": ("+", 2)}),
-         ("Tempest Archmage", 14000, "Lightning hits 30, +5 dmg",
+         ("Tempest Sage", 14000, "Lightning hits 30, +5 dmg",
           {"chain": ("=", 30), "dmg": ("+", 5), "rate": ("*", 0.6)})],
         [("Inferno Wyrm", 3200, "Fire does 3 damage", {"breath_dmg": ("=", 3), "range": ("+", 20)}),
          ("Dragon King", 13000, "Fire does 8 damage",
           {"breath_dmg": ("=", 8), "dmg": ("+", 3), "rate": ("*", 0.6)})],
     ],
     "spike": [
-        [("Big Mines", 4000, "Piles pop 10 more, +2 dmg", {"pierce": ("+", 10), "dmg": ("+", 2)}),
+        [("Big Blasts", 4000, "Piles pop 10 more, +2 dmg", {"pierce": ("+", 10), "dmg": ("+", 2)}),
          ("Minefield", 15000, "Piles pop 30 more, +5 dmg", {"pierce": ("+", 30), "dmg": ("+", 5), "rate": ("*", 0.6)})],
         [("Spike Rain", 6000, "Makes spikes much faster",
           {"rate": ("*", 0.6), "pierce": ("+", 4), "pile_cap": ("=", 60)}),
@@ -643,7 +650,7 @@ TIERS_4_5 = {
         [("Star Forge", 30000, "+4 damage, +5 pierce", {"dmg": ("+", 4), "pierce": ("+", 5), "rate": ("*", 0.8)}),
          ("Cosmic Titan", 90000, "+12 damage, 4x vs blimps",
           {"dmg": ("+", 12), "pierce": ("+", 10), "blimp_mult": ("=", 4)})],
-        [("Robo Guard", 22000, "3 beams, +2 damage", {"count": ("=", 3), "dmg": ("+", 2)}),
+        [("Mech Guard", 22000, "3 beams, +2 damage", {"count": ("=", 3), "dmg": ("+", 2)}),
          ("Mecha Sentinel", 65000, "4 beams, 8x vs blimps",
           {"count": ("=", 4), "dmg": ("+", 6), "blimp_mult": ("=", 8)})],
     ],
@@ -657,7 +664,7 @@ TIERS_4_5 = {
         [("Warship", 3800, "6 cannonballs, +2 damage", {"count": ("=", 6), "dmg": ("+", 2)}),
          ("Dread Armada", 15000, "10 cannonballs, +4 damage",
           {"count": ("=", 10), "dmg": ("+", 4), "pierce": ("+", 4), "blimp_mult": ("=", 3)})],
-        [("Merchant Empire", 5000, "+$700 every round", {"income": ("=", 700)}),
+        [("Spice Route", 5000, "+$700 every round", {"income": ("=", 700)}),
          ("Golden Armada", 18000, "+$2000/round, faster", {"income": ("=", 2000), "rate": ("*", 0.6)})],
     ],
     "sub": [
@@ -734,11 +741,11 @@ def hero_stats(key, lvl):
 
 # name, cooldown (seconds), what it does
 ABILITIES = {
-    "dart_storm":   ("Dart Storm", 40, "Darts fly 4x faster for 6s"),
-    "tack_nova":    ("Tack Nova", 35, "Blasts 48 tacks all around"),
+    "dart_storm":   ("Bolt Storm", 40, "Bolts fly 4x faster for 6s"),
+    "tack_nova":    ("Needle Nova", 35, "Blasts 48 needles all around"),
     "rang_barrage": ("Rang Barrage", 40, "Throws 12 boomerangs"),
     "carpet_bomb":  ("Carpet Bomb", 50, "Bombs the front of the line"),
-    "glue_rain":    ("Glue Rain", 45, "Glues every balloon"),
+    "glue_rain":    ("Goo Rain", 45, "Covers every balloon in goo"),
     "blizzard":     ("Blizzard", 50, "Freezes every balloon 3s"),
     "smoke_bomb":   ("Smoke Bomb", 45, "Knocks all balloons back"),
     "cash_crate":   ("Cash Crate", 50, "Drops $300"),
@@ -765,15 +772,15 @@ ABILITIES = {
 
 STAT_LABELS = [("dmg", "Damage"), ("pierce", "Pierce"), ("count", "Shots"), ("rate", "Speed"),
                ("range", "Range"), ("blast", "Blast"), ("freeze", "Freeze"), ("chain", "Zaps"),
-               ("knock", "Push"), ("glue_time", "Glue"), ("slow", "Slow"), ("life", "Spikes last"),
+               ("knock", "Push"), ("glue_time", "Goo"), ("slow", "Slow"), ("life", "Spikes last"),
                ("income", "Income"), ("lives", "Lives"), ("boost", "Boost"), ("discount", "Discount"),
                ("blimp_mult", "vs blimps"), ("ab_power", "Ability power"), ("ball_dmg", "Ball dmg"),
                ("ball_pierce", "Ball pops"), ("ball_bounces", "Bounces"), ("breath_dmg", "Fire dmg"),
                ("drums", "Speed boost"), ("pile_cap", "Max piles"), ("cluster", "Mini bombs"),
                ("splash", "Splash"), ("acid", "Acid every")]
 FLAG_LABELS = {"camo": "sees camo", "homing": "homing", "spikeball": "Spike Ball", "breath": "flamethrower",
-               "freeze_white": "freezes white", "radar": "camo radar", "rune": "lead popping",
-               "glue_blimp": "glues blimps", "mines": "spike mines", "ability": "new ability", "acid": "acid"}
+               "freeze_white": "freezes white", "radar": "camo radar", "rune": "iron popping",
+               "glue_blimp": "goos blimps", "mines": "spike mines", "ability": "new ability", "acid": "acid"}
 
 
 def fmt_stat(key, v):
@@ -801,7 +808,7 @@ def stat_changes(old, new):
         if new.get(key) and not old.get(key):
             out.append("+" + label)
     if new.get("dtype") != old.get("dtype") and new.get("dtype") in ("normal", "magic"):
-        out.append("+pops lead")
+        out.append("+pops iron")
     return ", ".join(out) or "Small boost"
 
 
@@ -946,6 +953,33 @@ class Input:
         self.hold_time = {}
         self.joys = {}
         self.virtual = set()    # buttons held by something else (the emulator)
+        self.mouse = (-1, -1)   # mouse position (game coordinates)
+        self.moved = False      # the mouse moved this frame
+        self.click = None       # left click this frame (position)
+        self.rclick = False     # right click this frame (works like B)
+        self.wheel = 0          # mouse wheel steps this frame
+
+    def begin_frame(self):
+        self.moved, self.click, self.rclick, self.wheel = False, None, False, 0
+
+    def mouse_event(self, e, offset=(0, 0)):
+        """Remember a mouse event. offset: where the game screen sits in the window."""
+        if e.type == pygame.MOUSEWHEEL:
+            self.wheel += e.y
+            return
+        pos = (e.pos[0] - offset[0], e.pos[1] - offset[1])
+        if e.type == pygame.MOUSEMOTION:
+            self.mouse, self.moved = pos, True
+        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            self.mouse, self.click = pos, pos
+        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 3:
+            self.rclick = True
+
+    def inject(self, *keys):
+        """Act as if these buttons were just pressed (used by mouse clicks)."""
+        for k in keys:
+            self.pressed.add(k)
+            self.repeat.add(k)
 
     def add_joystick(self, index):
         j = pygame.joystick.Joystick(index)
@@ -2665,6 +2699,9 @@ class Game:
         elif self.mode == "menu":
             self.update_menu(inp)
         else:
+            mx, my = inp.mouse
+            if inp.moved and 0 <= mx < SCREEN_W and MAP_Y <= my < PANEL_Y and not self.overlay:
+                self.cx, self.cy = float(mx), float(my)   # the cursor follows the mouse
             self.move_cursor(dt, inp)
             if self.mode == "normal":
                 self.update_normal(inp)
@@ -2678,6 +2715,33 @@ class Game:
             if self.overlay:
                 break
             self.step(sim / steps)
+
+    def open_pause(self):
+        if not self.overlay:
+            self.overlay, self.over_idx = "pause", 0
+
+    def pick_from_shop(self, i):
+        """Mouse: pick a tower from the shop (click it again to put it back)."""
+        if self.overlay:
+            return
+        if self.mode == "place" and self.shop == i:
+            self.mode = "normal"
+        else:
+            self.shop, self.mode = i, "place"
+
+    def map_click(self, pos):
+        """Left click on the map: build (if a tower is picked), or open/close a tower's menu."""
+        if self.overlay:
+            return
+        self.cx, self.cy = pos
+        if self.mode == "place":
+            self.app.inp.inject("A")
+            return
+        t = self.tower_at(*pos)
+        if t:
+            self.open_menu(t)
+        else:
+            self.mode = "normal"
 
     def move_cursor(self, dt, inp):
         dx = ("RIGHT" in inp.held) - ("LEFT" in inp.held)
@@ -2829,7 +2893,7 @@ class Game:
                 "Tower guide", "Restart", "Quit to title"]
         if self.overlay == "sandbox":
             sb = self.sb
-            return ["Balloon: < %s >" % BALLOON_ORDER[sb["kind"]].capitalize(),
+            return ["Balloon: < %s >" % balloon_label(BALLOON_ORDER[sb["kind"]]),
                     "Type: < %s >" % SANDBOX_FLAGS[sb["flags"]][0],
                     "Amount: < %d >" % SANDBOX_AMOUNTS[sb["amount"]],
                     "Send balloons!",
@@ -2900,7 +2964,7 @@ class Game:
             gap = 1.0 if BALLOON_TYPES[name].get("blimp") else 0.25
             for i in range(SANDBOX_AMOUNTS[sb["amount"]]):
                 self.sb_spawns.append([i * gap, name, flags])
-            self.toast("Sending %d %s" % (SANDBOX_AMOUNTS[sb["amount"]], name), 1.2)
+            self.toast("Sending %d %s" % (SANDBOX_AMOUNTS[sb["amount"]], balloon_label(name)), 1.2)
             self.overlay = None
         elif choice.startswith("Jump"):
             self.queue, self.qi = [], 0
@@ -2924,6 +2988,7 @@ class Game:
     def draw(self, surf):
         app = self.app
         surf.blit(app.map_bg(self.map_idx), (0, MAP_Y))
+        app.hit((0, MAP_Y, SCREEN_W, MAP_H), lambda xr, r: self.map_click(app.inp.click))
 
         for x, y, _, _, t in self.spikes:
             col = (255, 150, 60) if t.s["dtype"] == "normal" else (205, 205, 215)
@@ -3114,6 +3179,8 @@ class Game:
             left = t.ab_cool.get(aid, 0)
             pygame.draw.circle(surf, (20, 22, 32), (x, y), 21)
             surf.blit(app.mini_sprite(t.key), (x - 15, y - 15))
+            app.hit((x - 22, y - 22, 44, 44), lambda xr, r, t=t, aid=aid: self.use_ability(t, aid),
+                    lambda i=i: setattr(self, "ab_idx", i))
             if left > 0:   # dark "clock" sweep while recharging
                 frac = left / ABILITIES[aid][1]
                 cover = pygame.Surface((42, 42), pygame.SRCALPHA)
@@ -3231,20 +3298,37 @@ class Game:
         pygame.draw.circle(surf, YELLOW, (130, 20), 11)
         pygame.draw.circle(surf, (180, 140, 30), (130, 20), 11, 2)
         surf.blit(app.text(app.f_norm, "%d" % self.money, WHITE), (147, 8))
-        if self.auto:
-            img = app.text(app.f_small, "AUTO", DARK)
-            r = img.get_rect(midleft=(236, 21))
-            pygame.draw.rect(surf, GREEN, r.inflate(10, 6), border_radius=6)
-            surf.blit(img, r)
+        # buttons: start round / pause, speed, game menu (clickable; START, SELECT and B do the same)
+        for bx, kind in ((232, "go"), (270, "speed"), (308, "menu")):
+            rect = pygame.Rect(bx, 6, 34, 28)
+            hover = rect.collidepoint(app.inp.mouse)
+            pygame.draw.rect(surf, (60, 70, 100) if hover else (38, 44, 64), rect, border_radius=8)
+            pygame.draw.rect(surf, (90, 100, 135), rect, 1, border_radius=8)
+            cx, cy = rect.center
+            if kind == "go":
+                if self.active:   # pause sign
+                    pygame.draw.rect(surf, WHITE, (cx - 6, cy - 7, 4, 14))
+                    pygame.draw.rect(surf, WHITE, (cx + 2, cy - 7, 4, 14))
+                else:             # play triangle
+                    pygame.draw.polygon(surf, GREEN, [(cx - 5, cy - 8), (cx + 7, cy), (cx - 5, cy + 8)])
+                if self.auto:     # little green dot = auto-start is on
+                    pygame.draw.circle(surf, GREEN, (rect.right - 5, rect.y + 5), 3)
+                app.hit(rect, lambda xr, r: app.inp.inject("START"))
+            elif kind == "speed":
+                img = app.text(app.f_small, "%dx" % self.speed, YELLOW if self.speed > 1 else WHITE)
+                surf.blit(img, img.get_rect(center=rect.center))
+                app.hit(rect, lambda xr, r: app.inp.inject("SELECT"))
+            else:
+                for dy in (-6, 0, 6):   # menu lines
+                    pygame.draw.line(surf, WHITE, (cx - 8, cy + dy), (cx + 8, cy + dy), 2)
+                app.hit(rect, lambda xr, r: self.open_pause())
         goal = self.goal if self.round <= self.goal else FINAL_ROUND
         rtxt = "Round %d/%d" % (max(1, self.round), goal) if self.round <= FINAL_ROUND \
             else "Round %d" % self.round
         img = app.text(app.f_norm, rtxt, WHITE)
-        surf.blit(img, (SCREEN_W - img.get_width() - (16 + 13 * self.speed if self.speed > 1 else 10), 8))
-        if self.speed > 1:
-            for i in range(self.speed):
-                x = SCREEN_W - 10 - 13 * self.speed + i * 13
-                pygame.draw.polygon(surf, YELLOW, [(x, 11), (x + 12, 20), (x, 29)])
+        if img.get_width() > SCREEN_W - 352:
+            img = app.text(app.f_small, rtxt, WHITE)
+        surf.blit(img, (SCREEN_W - img.get_width() - 8, 20 - img.get_height() // 2))
 
     def draw_shop_strip(self, surf, highlight):
         app = self.app
@@ -3267,9 +3351,12 @@ class Game:
                                  (x + slot_w // 2 + 16, PANEL_Y + 40), 4)   # not allowed in this mode
             img = app.text(app.f_small, "$%d" % cost, GREEN if self.money >= cost else (230, 110, 110))
             surf.blit(img, img.get_rect(center=(x + slot_w // 2, PANEL_Y + 54)))
+            app.hit((x + 2, PANEL_Y + 3, slot_w - 4, 62), lambda xr, r, i=i: self.pick_from_shop(i))
         for side, show in ((-1, first > 0), (1, first + shown < len(SHOP))):
             if show:   # little arrows: more towers this way
                 ax = 5 if side < 0 else SCREEN_W - 5
+                app.hit((0 if side < 0 else SCREEN_W - 14, PANEL_Y + 3, 14, 62),
+                        lambda xr, r, side=side: self.pick_from_shop((self.shop + side) % len(SHOP)))
                 pygame.draw.polygon(surf, YELLOW, [(ax, PANEL_Y + 28), (ax - side * 7, PANEL_Y + 20),
                                                    (ax - side * 7, PANEL_Y + 36)])
 
@@ -3395,8 +3482,15 @@ class Game:
         surf.blit(app.text(app.f_small, rows[self.menu][2], (190, 195, 210)), (18, y0 + 36))
         stat_col = GREEN if stats.startswith(">") else (150, 200, 255)
         surf.blit(app.text(app.f_small, stats[:46], stat_col), (18, y0 + 60))
+        app.hit(box, lambda xr, r: None)   # clicks on the box don't fall through to the map
         for i, (label, col, _) in enumerate(rows):
             ry = y0 + 90 + i * 34
+            pick = (lambda i=i: setattr(self, "menu", i))
+            if keys[i] in ("target", "curve"):
+                app.hit((14, ry - 2, SCREEN_W - 28, 31), lambda xr, r, pick=pick: (
+                    pick(), app.inp.inject("LEFT" if xr < r.w / 3 else "RIGHT")), pick)
+            else:
+                app.hit((14, ry - 2, SCREEN_W - 28, 31), lambda xr, r, pick=pick: (pick(), app.inp.inject("A")), pick)
             if i == self.menu:
                 pygame.draw.rect(surf, PANEL_HI, (14, ry - 2, SCREEN_W - 28, 31), border_radius=6)
                 pygame.draw.rect(surf, YELLOW, (14, ry - 2, SCREEN_W - 28, 31), 2, border_radius=6)
@@ -3409,6 +3503,7 @@ class Game:
     def draw_overlay(self, surf):
         app = self.app
         surf.blit(app.dim, (0, 0))
+        app.hit((0, 0, SCREEN_W, SCREEN_H), lambda xr, r: None)   # the game underneath can't be clicked
         if self.overlay == "pause":
             title, sub = "Paused", "Round %d" % max(1, self.round)
         elif self.overlay == "sandbox":
@@ -3425,7 +3520,8 @@ class Game:
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, top)))
         img = app.text(app.f_norm, sub, WHITE)
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, top + 55)))
-        app.draw_menu_list(surf, items, self.over_idx, top + 110, 52 if len(items) <= 4 else 50 if len(items) <= 6 else 44)
+        app.draw_menu_list(surf, items, self.over_idx, top + 110, 52 if len(items) <= 4 else 50 if len(items) <= 6 else 44,
+                           lambda i: setattr(self, "over_idx", i))
 
 
 # =====================================================================
@@ -3500,8 +3596,53 @@ class App:
         self.ach_scroll = 0
         self.banners = []        # achievement banners waiting to show
         self.smoke_frames = 0    # --smoke-test: quit after this many frames
+        self.hits = []           # clickable areas from the last frame: (rect, on_click, on_hover)
+        self.next_hits = []
         self.guide_back = "title"
         self._previews = {}
+
+    # ---------------------------------------------------------- mouse
+    def hit(self, rect, on_click, on_hover=None):
+        """Make an area clickable this frame. Later areas sit on top of earlier ones."""
+        self.next_hits.append((pygame.Rect(rect), on_click, on_hover))
+
+    def process_mouse(self):
+        inp = self.inp
+        g = self.game if self.state == "game" else None
+        if inp.rclick and not (g and g.mode == "normal" and not g.overlay):
+            inp.inject("B")
+        if inp.moved:
+            for rect, _, hover in reversed(self.hits):
+                if rect.collidepoint(inp.mouse):
+                    if hover:
+                        hover()
+                    break
+        if inp.click:
+            for rect, click, _ in reversed(self.hits):
+                if rect.collidepoint(inp.click):
+                    if click:
+                        click(inp.click[0] - rect.x, rect)
+                    break
+        if inp.wheel:   # wheel up = -1 step, down = +1 step, by however many notches it turned
+            step = -inp.wheel
+            if self.state == "achievements":
+                self.ach_scroll = max(0, min(len(ACHIEVEMENTS) - 8, self.ach_scroll + step))
+            elif self.state == "towers":
+                self.tab_idx = (self.tab_idx + step) % len(SHOP)
+            elif g and not g.overlay and g.mode in ("normal", "place"):
+                g.pick_from_shop((g.shop + step) % len(SHOP))   # scroll through the shop
+            else:
+                inp.inject("DOWN" if step > 0 else "UP")
+
+    def lr_click(self, select, xrel, rect):
+        """Click on a '< value >' row: left third = LEFT, right third = RIGHT, middle = A."""
+        select()
+        if xrel < rect.w / 3:
+            self.inp.inject("LEFT")
+        elif xrel > rect.w * 2 / 3:
+            self.inp.inject("RIGHT")
+        else:
+            self.inp.inject("A")
 
     # ---------------------------------------------------------- caches
     def text(self, font, s, color):
@@ -3676,6 +3817,17 @@ class App:
         self.game = None
         self.title_idx = 0
 
+    def slider_click(self, x):
+        """Click on the sound slider: set the volume to that spot."""
+        bx, w = getattr(self, "slider_box", (0, 1))
+        if x < bx - 20:
+            self.change_volume(-10)
+        elif x > bx + w + 20:
+            self.change_volume(10)
+        else:
+            want = int(round(max(0, min(1, (x - bx) / w)) * 10)) * 10
+            self.change_volume(want - self.save.get("volume", 70))
+
     def change_volume(self, step):
         """Move the sound slider by step (in %), save it, and play a test pop."""
         vol = max(0, min(100, self.save.get("volume", 70) + step))
@@ -3685,10 +3837,20 @@ class App:
         self.sounds.last_pop = 0
         self.sounds.play("pop")
 
-    def draw_menu_list(self, surf, items, idx, y, gap=52):
+    def draw_menu_list(self, surf, items, idx, y, gap=52, select=None):
+        """A centered list of menu items. select(i) picks item i (for mouse support)."""
         for i, label in enumerate(items):
             col = YELLOW if i == idx else WHITE
             cy = y + i * gap
+            if select:
+                row = pygame.Rect(40, cy - gap // 2, SCREEN_W - 80, gap)
+                pick = (lambda i=i: select(i))
+                if label == SOUND_ROW:
+                    self.hit(row, lambda xr, r, pick=pick: (pick(), self.slider_click(xr + r.x)), pick)
+                elif "<" in label:
+                    self.hit(row, lambda xr, r, pick=pick: self.lr_click(pick, xr, r), pick)
+                else:
+                    self.hit(row, lambda xr, r, pick=pick: (pick(), self.inp.inject("A")), pick)
             if label == SOUND_ROW:   # "Sound" with a slider bar
                 vol = self.save.get("volume", 70)
                 img = self.text(self.f_med, "Sound", col)
@@ -3705,6 +3867,7 @@ class App:
                 pygame.draw.rect(surf, (20, 22, 32), (bx, cy - 6, bar_w, 12), border_radius=6)
                 pygame.draw.rect(surf, col, (bx, cy - 6, int(bar_w * vol / 100), 12), border_radius=6)
                 pygame.draw.rect(surf, (120, 130, 160), (bx, cy - 6, bar_w, 12), 1, border_radius=6)
+                self.slider_box = (bx, bar_w)
                 pygame.draw.circle(surf, WHITE, (bx + int(bar_w * vol / 100), cy), 9)
                 pygame.draw.circle(surf, (60, 60, 80), (bx + int(bar_w * vol / 100), cy), 9, 2)
                 surf.blit(pct, (bx + bar_w + 14, cy - pct.get_height() // 2))
@@ -3830,6 +3993,8 @@ class App:
                 color = (215, 120, 40) if row == "play" else (120, 80, 160) if row == "towers" else (70, 90, 150)
             h = (54 if sub else 44) if len(rows) > 6 else (58 if sub else 48)
             self.draw_button(surf, (90, y, 300, h), label, i == self.title_idx, color, sub)
+            pick = (lambda i=i: setattr(self, "title_idx", i))
+            self.hit((90, y, 300, h), lambda xr, r, pick=pick: (pick(), self.inp.inject("A")), pick)
             y += h + (9 if len(rows) > 6 else 11)
         img = self.text(self.f_small, "D-pad: choose    A: OK", (40, 60, 40))
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 628 - 20)))
@@ -3912,6 +4077,13 @@ class App:
                          (150, 90, 50) if mid != "none" else (80, 80, 100), mdesc + ("  (beaten!)" if beaten else ""))
         self.draw_button(surf, (90, 530, 300, 50), "START!", row == "start", (60, 160, 70))
         self.draw_button(surf, (170, 592, 140, 38), "Back", row == "back", (90, 90, 110))
+        rows = self.PLAY_ROWS
+        sel = (lambda name: (lambda: setattr(self, "play_idx", rows.index(name))))
+        self.hit(card, lambda xr, r: self.lr_click(sel("map"), xr, r), sel("map"))
+        self.hit((90, 392, 300, 56), lambda xr, r: self.lr_click(sel("mode"), xr, r), sel("mode"))
+        self.hit((90, 460, 300, 56), lambda xr, r: self.lr_click(sel("mod"), xr, r), sel("mod"))
+        self.hit((90, 530, 300, 50), lambda xr, r: (sel("start")(), self.inp.inject("A")), sel("start"))
+        self.hit((170, 592, 140, 38), lambda xr, r: (sel("back")(), self.inp.inject("A")), sel("back"))
 
     # ----- towers & heroes: every upgrade, one tab per tower (L/R to switch)
     def wrap(self, text, font, width):
@@ -3956,6 +4128,7 @@ class App:
             if sel:
                 pygame.draw.rect(surf, YELLOW, rect, 3, border_radius=10)
             surf.blit(pygame.transform.smoothscale(self.icons[SHOP[i]["key"]], (40, 40)), (x - 20, 9))
+            self.hit(rect, lambda xr, r, i=i: setattr(self, "tab_idx", i))
         for side, show in ((-1, first > 0), (1, first + shown < len(SHOP))):
             if show:
                 ax = 3 if side < 0 else SCREEN_W - 3
@@ -4012,6 +4185,7 @@ class App:
             surf.blit(self.text(self.f_tiny, "* = ability (L + R).  One path can reach 5, another up to 2.",
                                 (160, 170, 200)), (12, y))
         pygame.draw.rect(surf, (22, 25, 38), (0, SCREEN_H - 30, SCREEN_W, 30))
+        self.hit((0, SCREEN_H - 30, SCREEN_W, 30), lambda xr, r: self.inp.inject("B"))
         img = self.text(self.f_small, "L / R: switch tab     B: back to " + ("game" if self.guide_back == "game" else "menu"),
                         (200, 205, 225))
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, SCREEN_H - 15)))
@@ -4090,6 +4264,7 @@ class App:
             surf.blit(self.text(self.f_norm, name, WHITE if have else (170, 175, 190)), (card.x + 56, y + 7))
             surf.blit(self.text(self.f_small, desc, (210, 200, 160) if have else (130, 135, 155)), (card.x + 56, y + 33))
         pygame.draw.rect(surf, (22, 25, 38), (0, SCREEN_H - 30, SCREEN_W, 30))
+        self.hit((0, SCREEN_H - 30, SCREEN_W, 30), lambda xr, r: self.inp.inject("B"))
         img = self.text(self.f_small, "UP / DOWN: scroll     B: back", (200, 205, 225))
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, SCREEN_H - 15)))
 
@@ -4124,7 +4299,7 @@ class App:
         pygame.draw.rect(surf, (40, 48, 75), panel, border_radius=18)
         items = ["Auto-start: < %s >" % ("ON" if self.save.get("auto_start") else "OFF"),
                  SOUND_ROW, "Button test", "Back"]
-        self.draw_menu_list(surf, items, self.set_idx, 190, 78)
+        self.draw_menu_list(surf, items, self.set_idx, 190, 78, lambda i: setattr(self, "set_idx", i))
         tips = {"auto": "Start the next round by itself",
                 "sound": "LEFT/RIGHT: volume   A: mute",
                 "buttons": "Check your handheld's buttons",
@@ -4150,8 +4325,8 @@ class App:
         ("One path can reach 5, another up to 2.", WHITE),
         ("One hero per game; it levels up to 20.", WHITE),
         ("Ships, subs and sharks go on water.", WHITE),
-        ("Lead: bombs, fire or magic. Purple: no magic.", WHITE),
-        ("Regrow balloons grow back: finish them!", WHITE),
+        ("Iron: bombs, fire or magic. Violet: no magic.", WHITE),
+        ("Healing balloons grow back: finish them!", WHITE),
         ("Beat round 150 to be Champion! (autosaves)", WHITE),
     ]
 
@@ -4159,10 +4334,12 @@ class App:
         surf.fill(DARK)
         for i, (line, col) in enumerate(self.HELP):
             surf.blit(self.text(self.f_small, line, col), (20, 14 + i * 28))
-        for j, line in enumerate(("Keyboard: arrows  Z = A  X = B  A / S = L / R",
+        for j, line in enumerate(("Mouse: click anything. Right-click = back. Wheel = scroll",
+                                  "Keyboard: arrows  Z = A  X = B  A / S = L / R",
                                   "Enter = START  Tab = SELECT  D = powers  F11 = fullscreen")):
             img = self.text(self.f_tiny, line, (150, 200, 255))
-            surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 584 + j * 16)))
+            surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 570 + j * 16)))
+        self.hit((0, 0, SCREEN_W, SCREEN_H), lambda xr, r: self.inp.inject("B"))
         img = self.text(self.f_small, "Press A or B to go back", GRAY)
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, SCREEN_H - 20)))
 
@@ -4212,15 +4389,64 @@ class App:
             surf.blit(self.text(self.f_small, line, GRAY), (20, y))
             y += 30
 
+    def frame(self, dt):
+        """One frame after the events are read: update and draw the current screen."""
+        self.inp.update(dt)
+        self.hits, self.next_hits = self.next_hits, []
+        self.process_mouse()
+
+        if self.state == "title":
+            self.update_title(dt)
+            self.draw_title(self.canvas)
+        elif self.state == "play":
+            self.update_play(dt)
+            if self.state == "play":
+                self.draw_play(self.canvas)
+        elif self.state == "settings":
+            self.update_settings(dt)
+            if self.state == "settings":
+                self.draw_settings(self.canvas)
+        elif self.state == "achievements":
+            self.update_achievements(dt)
+            if self.state == "achievements":
+                self.draw_achievements(self.canvas)
+        elif self.state == "towers":
+            self.update_towers(dt)
+            if self.state == "towers":
+                self.draw_towers(self.canvas)
+        elif self.state == "help":
+            if "A" in self.inp.pressed or "B" in self.inp.pressed:
+                self.state = "title"
+            self.draw_help(self.canvas)
+        elif self.state == "buttons":
+            self.update_buttons(dt)
+            self.draw_buttons(self.canvas)
+        elif self.state == "game":
+            self.game.update(dt, self.inp)
+            if self.game:   # may have quit to the title
+                self.game.draw(self.canvas)
+        self.draw_banner(self.canvas, dt)
+        self.present()
+        if self.smoke_frames:
+            self.smoke_frames -= 1
+            if self.smoke_frames == 0:
+                self.running = False
+
     # ---------------------------------------------------------- main loop
     def run(self):
         for i in range(pygame.joystick.get_count()):
             self.inp.add_joystick(i)
         while self.running:
             dt = min(self.clock.tick(FPS) / 1000.0, 0.1)
+            self.inp.begin_frame()
             for e in pygame.event.get():
                 if e.type == pygame.QUIT:
                     self.running = False
+                elif e.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEWHEEL) and self.on_event(e):
+                    pass
+                elif e.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEWHEEL):
+                    if not self.rotate:
+                        self.inp.mouse_event(e)
                 elif e.type == pygame.JOYDEVICEADDED:
                     self.inp.add_joystick(e.device_index)
                 elif e.type == pygame.JOYDEVICEREMOVED:
@@ -4236,44 +4462,7 @@ class App:
                         self.running = False
                     elif self.state != "game":
                         self.state = "title"
-            self.inp.update(dt)
-
-            if self.state == "title":
-                self.update_title(dt)
-                self.draw_title(self.canvas)
-            elif self.state == "play":
-                self.update_play(dt)
-                if self.state == "play":
-                    self.draw_play(self.canvas)
-            elif self.state == "settings":
-                self.update_settings(dt)
-                if self.state == "settings":
-                    self.draw_settings(self.canvas)
-            elif self.state == "achievements":
-                self.update_achievements(dt)
-                if self.state == "achievements":
-                    self.draw_achievements(self.canvas)
-            elif self.state == "towers":
-                self.update_towers(dt)
-                if self.state == "towers":
-                    self.draw_towers(self.canvas)
-            elif self.state == "help":
-                if "A" in self.inp.pressed or "B" in self.inp.pressed:
-                    self.state = "title"
-                self.draw_help(self.canvas)
-            elif self.state == "buttons":
-                self.update_buttons(dt)
-                self.draw_buttons(self.canvas)
-            elif self.state == "game":
-                self.game.update(dt, self.inp)
-                if self.game:   # may have quit to the title
-                    self.game.draw(self.canvas)
-            self.draw_banner(self.canvas, dt)
-            self.present()
-            if self.smoke_frames:
-                self.smoke_frames -= 1
-                if self.smoke_frames == 0:
-                    self.running = False
+            self.frame(dt)
             pygame.display.flip()
 
     def on_event(self, e):

@@ -1,6 +1,6 @@
 # Balloon Blitz 🎈
 
-A balloon-popping tower defense game (inspired by Bloons TD 6) for the
+A balloon-popping tower defense game for the
 homemade Raspberry Pi handheld. To play it on a computer, use the
 emulator in [`../pc-tester`](../pc-tester).
 
@@ -33,7 +33,7 @@ Pick one on the Play screen under the difficulty for an extra challenge:
 | Difficulty | Modifiers |
 |---|---|
 | Easy | **No Heroes**, **3/4 Cash** |
-| Normal | **Few Upgrades** (max 4 per tower), **Tier 3 Max**, **Classic Six** (only Dart, Tack, Bomb, Frost, Sniper, Coin Mine) |
+| Normal | **Few Upgrades** (max 4 per tower), **Tier 3 Max**, **Classic Six** (only Dart, Tack, Bomb, Frost, Marksman Nest, Coin Mine) |
 | Hard | **Hardcore** (1 life), **Half Cash**, **Quarter Cash**, **No Cash Gain**, **No Abilities**, **Seven Towers** (max 7 at once), **Fortune Run** (start with $50,000, earn nothing, survive to round 50) |
 
 Cash modifiers change all money you earn (pops, round bonuses, mines, abilities);
@@ -85,9 +85,9 @@ Every tower has **three upgrade paths with 5 tiers each** (that's 15 upgrades pe
 
 | Tower | Top path tier 4 / 5 | Middle tier 4 (ability) / 5 | Bottom path tier 4 / 5 |
 |---|---|---|---|
-| Dart Tower | Iron Boulder $3,200 / Doom Boulder $14,000 | Dart Storm $2,800 / Eye of the Storm $12,000 | Dart Gunner $2,600 / Dart Hurricane $11,000 |
-| Wizard | Storm Caller $3,500 / Tempest Archmage $14,000 | Meteor $4,000 / Starfall $15,000 | Inferno Wyrm $3,200 / Dragon King $13,000 |
-| Shark | Titan Bite $4,500 / Megalodon $16,000 | Feeding Frenzy $3,500 / Apex Predator $13,000 | Whirlpool $3,500 / Maelstrom $13,000 |
+| Crossbow Post | Iron Boulder $3,200 / Doom Boulder $14,000 | Bolt Storm $2,800 / Eye of the Storm $12,000 | Bolt Gunner $2,600 / Bolt Hurricane $11,000 |
+| Arcane Tower | Storm Caller $3,500 / Tempest Sage $14,000 | Meteor $4,000 / Starfall $15,000 | Inferno Wyrm $3,200 / Dragon King $13,000 |
+| Reef Shark | Titan Bite $4,500 / Megalodon $16,000 | Feeding Frenzy $3,500 / Apex Predator $13,000 | Whirlpool $3,500 / Maelstrom $13,000 |
 | Coin Mine | Mother Lode $4,500 / Dragon's Hoard $18,000 | Payday $4,500 / Jackpot $16,000 | Healing Spring $4,000 / Fountain of Life $15,000 |
 
 See every upgrade in **Towers & Heroes** on the main menu (or **Tower guide** in the game menu).
@@ -103,46 +103,46 @@ At middle **tier 5** every ability gets much stronger.
 
 | Tower | Ability | What it does |
 |---|---|---|
-| Dart Tower | Dart Storm | 4x faster darts for 6s |
-| Tack Shooter | Tack Nova | 48 tacks in every direction |
-| Boomerang | Rang Barrage | 12 boomerangs at once |
-| Bomb Tower | Carpet Bomb | Explosions all along the front of the balloons |
-| Glue Gunner | Glue Rain | Glues every balloon on screen |
-| Frost Tower | Blizzard | Freezes every balloon for 3s |
-| Ninja | Smoke Bomb | Knocks every balloon back and stuns it |
-| Sniper | Cash Crate | +$300 |
-| Wizard | Meteor | Huge blast on the strongest balloon |
-| Spike Factory | Spike Carpet | Covers the track in spikes |
-| Village | Rally Cry | All towers 2x faster for 8s |
-| Super Tower | Overdrive | 3x faster for 8s |
+| Crossbow Post | Bolt Storm | 4x faster darts for 6s |
+| Needle Dome | Needle Nova | 48 tacks in every direction |
+| Rang Hut | Rang Barrage | 12 boomerangs at once |
+| Mortar | Carpet Bomb | Explosions all along the front of the balloons |
+| Goo Tank | Goo Rain | Glues every balloon on screen |
+| Frost Spire | Blizzard | Freezes every balloon for 3s |
+| Shadow Dojo | Smoke Bomb | Knocks every balloon back and stuns it |
+| Marksman Nest | Cash Crate | +$300 |
+| Arcane Tower | Meteor | Huge blast on the strongest balloon |
+| Spike Press | Spike Carpet | Covers the track in spikes |
+| Camp | Rally Cry | All towers 2x faster for 8s |
+| Star Core | Overdrive | 3x faster for 8s |
 | Coin Mine | Payday | +$600 |
-| Pirate Ship | Broadside | 16 cannonballs all around |
-| Submarine | Depth Charge | Explosions along the front of the balloons |
-| Shark | Feeding Frenzy | Bites 3x faster for 8s |
+| Galleon | Broadside | 16 cannonballs all around |
+| Torpedo Sub | Depth Charge | Explosions along the front of the balloons |
+| Reef Shark | Feeding Frenzy | Bites 3x faster for 8s |
 
 ### Towers
 
 | Tower | Cost | What it does |
 |---|---|---|
-| Dart Tower | $170 | Throws darts; top upgrade rolls a bouncing Spike Ball |
-| Tack Shooter | $280 | Fires 12 tacks in every direction |
-| Boomerang | $325 | Curved throw that comes back (set Left/Right curve in its menu) |
-| Bomb Tower | $500 | Explosions pop groups and lead (not black) |
-| Glue Gunner | $200 | Fast-firing glue slows balloons; acid glue pops them |
-| Frost Tower | $350 | Freezes balloons around it |
-| Ninja | $400 | Fast throwing stars, sees camo |
-| Sniper | $350 | Hits anything anywhere on the map |
-| Wizard | $320 | Magic; Lightning Bolt and Dragon's Breath upgrades |
-| Spike Factory | $650 | Drops spike piles on the track (only during rounds) |
-| Village | $900 | Boosts towers in its circle: range, camo, speed, discounts, money |
-| Super Tower | $2200 | A storm of darts |
+| Crossbow Post | $170 | Throws darts; top upgrade rolls a bouncing Spike Ball |
+| Needle Dome | $280 | Fires 12 tacks in every direction |
+| Rang Hut | $325 | Curved throw that comes back (set Left/Right curve in its menu) |
+| Mortar | $500 | Explosions pop groups and iron (not black) |
+| Goo Tank | $200 | Fast-firing glue slows balloons; acid glue pops them |
+| Frost Spire | $350 | Freezes balloons around it |
+| Shadow Dojo | $400 | Fast throwing stars, sees camo |
+| Marksman Nest | $350 | Hits anything anywhere on the map |
+| Arcane Tower | $320 | Magic; Chain Spark and Fire Wyrm upgrades |
+| Spike Press | $650 | Drops spike piles on the track (only during rounds) |
+| Camp | $900 | Boosts towers in its circle: range, camo, speed, discounts, money |
+| Star Core | $2200 | A storm of darts |
 | Coin Mine | $600 | Earns money every round |
-| 🏴‍☠️ Pirate Ship | $450 | **Water only.** Fires 2 cannonballs at a time |
-| 🚢 Submarine | $350 | **Water only.** Torpedoes; Sonar sees camo |
-| 🦈 Shark | $400 | **Water only.** Bites nearby balloons hard |
+| 🏴‍☠️ Galleon | $450 | **Water only.** Fires 2 cannonballs at a time |
+| 🚢 Torpedo Sub | $350 | **Water only.** Torpedoes; Sonar sees camo |
+| 🦈 Reef Shark | $400 | **Water only.** Bites nearby balloons hard |
 
 All towers got a power boost from playtesting: they attack 15% faster, and darts,
-tacks, boomerangs, stars, magic and the Super Tower pop one extra balloon per shot.
+tacks, boomerangs, stars, magic and the Star Core pop one extra balloon per shot.
 
 ### Heroes
 
@@ -177,15 +177,15 @@ as rounds go by. They unlock two abilities as they level up.
 
 ### Balloons to watch out for
 
-- **Lead** (gray): darts and tacks bounce off. Use bombs, fire, magic, or Full Metal snipers.
-- **Black**: ignores explosions. **White**: can't be frozen. **Zebra**: both.
-- **Purple**: fast, and immune to **magic and fire** (Wizard, Ring of Fire, Plasma).
+- **Iron** (gray): darts and tacks bounce off. Use bombs, fire, magic, or Steel Core snipers.
+- **Black**: ignores explosions. **White**: can't be frozen. **Striped**: both.
+- **Violet**: fast, and immune to **magic and fire** (Arcane Tower, Flame Halo, Plasma Heart).
 - **Camo** (green spots): only towers with camo vision can target them
-  (Ninja, Eagle Eye, Night Scope, Radar Reload, Wizard Sight, Cold Snap,
-  Night Goggles, Sonar, Smell Blood, Crow's Nest, heroes, or a Village with Radar Hut).
-- **Regrow** (green **+** badge): grows its layers back every 3 seconds. Finish them fast!
-- **Fortified** (metal band): armored lead, ceramics and blimps that take twice the hits.
-- **Ceramic**: takes 10 hits.
+  (Shadow Dojo, Hawk Lens, Dark Lens, Radar Reload, True Sight, Snap Frost,
+  Night Lens, Sonar, Smell Blood, Lookout Mast, heroes, or a Camp with Lookout Post).
+- **Healing** (green **+** badge): grows its layers back every 3 seconds. Finish them fast!
+- **Armored** (metal band): armored iron, clay balloons and blimps that take twice the hits.
+- **Clay**: takes 10 hits.
 - **Blimp** (round 25) and **Titan** (round 30): giant bosses with health bars.
 - **Phantom** (from round 45): a fast, dark blimp that is **always camo** and immune to
   darts/tacks **and** explosions. Use magic, fire, normal-damage upgrades or bites.
