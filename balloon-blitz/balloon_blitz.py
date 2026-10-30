@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v3.3 (16 towers, 5 heroes, 8 maps)"
+VERSION = "v4.0 (16 towers, 5 tiers, 5 heroes, 8 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -408,6 +408,204 @@ MIDDLE_PATHS = {
 }
 for _tt in TOWER_TYPES:
     _tt["paths"].insert(1, MIDDLE_PATHS[_tt["key"]])
+
+# ---------------------------------------------------------------------
+# Tiers 4 and 5. Each tier costs about 2.5-4x the one before and is a
+# big jump in power. Only one path per tower can go past level 2.
+# ---------------------------------------------------------------------
+# Middle path, tiers 3-5: tier 3 is a stat boost, tier 4 UNLOCKS the
+# ability, tier 5 powers the ability up ("ab_power").
+MIDDLE_TOP = {
+    "dart": [("Piercing Darts", 900, "+2 pierce, 15% faster", {"pierce": ("+", 2), "rate": ("*", 0.85)}),
+             ("Dart Storm", 2800, "Ability: 4x faster for 6s", {"ability": ("=", "dart_storm"), "rate": ("*", 0.8)}),
+             ("Eye of the Storm", 12000, "Huge Dart Storm, 3 darts",
+              {"ab_power": ("+", 1), "dmg": ("+", 2), "count": ("=", 3), "rate": ("*", 0.6)})],
+    "tack": [("Tack Overload", 1000, "+4 tacks, 15% faster", {"count": ("+", 4), "rate": ("*", 0.85)}),
+             ("Tack Nova", 3000, "Ability: 48-tack blast", {"ability": ("=", "tack_nova"), "pierce": ("+", 2)}),
+             ("Supernova", 12000, "Massive Tack Nova, +2 dmg", {"ab_power": ("+", 1), "dmg": ("+", 2), "rate": ("*", 0.6)})],
+    "boom": [("Return Spin", 1100, "Pops 4 more, 15% faster", {"pierce": ("+", 4), "rate": ("*", 0.85)}),
+             ("Rang Barrage", 3000, "Ability: 12 boomerangs", {"ability": ("=", "rang_barrage"), "rate": ("*", 0.85)}),
+             ("Boomerang Storm", 12000, "Huge Rang Barrage",
+              {"ab_power": ("+", 1), "rate": ("*", 0.5), "pierce": ("+", 8)})],
+    "bomb": [("Heavy Shrapnel", 1300, "Bigger blasts, +1 damage", {"blast": ("+", 15), "dmg": ("+", 1)}),
+             ("Carpet Bomb", 3500, "Ability: bomb the front line", {"ability": ("=", "carpet_bomb"), "rate": ("*", 0.85)}),
+             ("Firestorm Fleet", 14000, "Huge Carpet Bomb, +3 dmg",
+              {"ab_power": ("+", 1), "dmg": ("+", 3), "blast": ("+", 20)})],
+    "glue": [("Quick Glue", 900, "Shoots 30% faster", {"rate": ("*", 0.7)}),
+             ("Glue Rain", 2800, "Ability: glue everything", {"ability": ("=", "glue_rain")}),
+             ("Glue Flood", 10000, "Glue Rain melts balloons",
+              {"ab_power": ("+", 1), "acid": ("=", 0.5), "pierce": ("+", 3)})],
+    "frost": [("Deep Cold", 1100, "Freezes longer, +15 range", {"freeze": ("+", 0.5), "range": ("+", 15)}),
+              ("Blizzard", 3000, "Ability: freeze everything", {"ability": ("=", "blizzard")}),
+              ("Ice Age", 11000, "Blizzard freezes and hurts", {"ab_power": ("+", 1), "dmg": ("+", 3), "rate": ("*", 0.7)})],
+    "ninja": [("Blade Dance", 1200, "Throws 25% faster", {"rate": ("*", 0.75)}),
+              ("Smoke Bomb", 3200, "Ability: knock all back", {"ability": ("=", "smoke_bomb")}),
+              ("Phantom Clan", 12000, "Huge Smoke Bomb, 3 stars",
+               {"ab_power": ("+", 1), "count": ("=", 3), "dmg": ("+", 2)})],
+    "sniper": [("Marksman", 1400, "+2 damage, 15% faster", {"dmg": ("+", 2), "rate": ("*", 0.85)}),
+               ("Cash Crate", 3500, "Ability: drops $300", {"ability": ("=", "cash_crate")}),
+               ("Gold Convoy", 14000, "Bigger crates, +$400/round", {"ab_power": ("+", 1), "income": ("=", 400)})],
+    "wizard": [("Arcane Focus", 1400, "+1 damage, pops 2 more", {"dmg": ("+", 1), "pierce": ("+", 2)}),
+               ("Meteor", 4000, "Ability: huge blast", {"ability": ("=", "meteor")}),
+               ("Starfall", 15000, "Many huge meteors", {"ab_power": ("+", 1), "pierce": ("+", 5), "rate": ("*", 0.6)})],
+    "spike": [("Spiky Steel", 1300, "Piles pop 4 more", {"pierce": ("+", 4)}),
+              ("Spike Carpet", 3500, "Ability: spike the track", {"ability": ("=", "spike_carpet")}),
+              ("Iron Fortress", 14000, "Huge Spike Carpet, +3 dmg", {"ab_power": ("+", 1), "dmg": ("+", 3)})],
+    "village": [("Grand Square", 2000, "+20 range, more boost", {"range": ("+", 20), "boost": ("+", 0.05)}),
+                ("Rally Cry", 5000, "Ability: all towers 2x speed", {"ability": ("=", "rally_cry")}),
+                ("Legend's Banner", 18000, "Huge Rally Cry", {"ab_power": ("+", 1), "drums": ("+", 0.1)})],
+    "super": [("Hyper Lens", 8000, "+1 damage, 15% faster", {"dmg": ("+", 1), "rate": ("*", 0.85)}),
+              ("Overdrive", 25000, "Ability: 3x speed for 8s", {"ability": ("=", "overdrive")}),
+              ("Infinity Drive", 70000, "Huge Overdrive, +5 damage", {"ab_power": ("+", 1), "dmg": ("+", 5)})],
+    "mine": [("Gem Carts", 1800, "+$150 every round", {"income": ("+", 150)}),
+             ("Payday", 4500, "Ability: instant $600", {"ability": ("=", "payday"), "income": ("+", 100)}),
+             ("Jackpot", 16000, "Payday pays $3000", {"ab_power": ("+", 1), "income": ("+", 300)})],
+    "pirate": [("Heavy Guns", 1200, "+1 damage, 15% faster", {"dmg": ("+", 1), "rate": ("*", 0.85)}),
+               ("Broadside", 3200, "Ability: cannons all around", {"ability": ("=", "broadside")}),
+               ("Admiral's Fury", 12000, "Huge Broadside, +3 damage", {"ab_power": ("+", 1), "dmg": ("+", 3)})],
+    "sub": [("Rapid Tubes", 1300, "Fires 25% faster", {"rate": ("*", 0.75)}),
+            ("Depth Charge", 3500, "Ability: blasts the front", {"ability": ("=", "depth_charge")}),
+            ("Abyss Strike", 13000, "Huge Depth Charge, +3 dmg", {"ab_power": ("+", 1), "dmg": ("+", 3)})],
+    "shark": [("Strong Jaw", 1300, "+2 damage", {"dmg": ("+", 2)}),
+              ("Feeding Frenzy", 3500, "Ability: 3x bites for 8s", {"ability": ("=", "feeding_frenzy")}),
+              ("Apex Predator", 13000, "Huge Frenzy, +4 damage", {"ab_power": ("+", 1), "dmg": ("+", 4)})],
+}
+
+# Top and bottom paths, tiers 4 and 5: [top (t4, t5), bottom (t4, t5)]
+TIERS_4_5 = {
+    "dart": [
+        [("Iron Boulder", 3200, "Bigger ball, bounces twice",
+          {"ball_pierce": ("=", 90), "ball_dmg": ("=", 4), "ball_bounces": ("=", 2)}),
+         ("Doom Boulder", 14000, "Crushes 250, bounces 4 times",
+          {"ball_pierce": ("=", 250), "ball_dmg": ("=", 12), "ball_bounces": ("=", 4),
+           "blimp_mult": ("=", 3), "rate": ("*", 0.7)})],
+        [("Dart Gunner", 2600, "Throws twice as fast", {"rate": ("*", 0.5), "pierce": ("+", 1)}),
+         ("Dart Hurricane", 11000, "Blinding speed, +2 damage",
+          {"rate": ("*", 0.4), "dmg": ("+", 2), "pierce": ("+", 3), "blimp_mult": ("=", 2)})],
+    ],
+    "tack": [
+        [("Blade Cyclone", 2800, "Spins much faster", {"rate": ("*", 0.6), "pierce": ("+", 3)}),
+         ("Razor Tempest", 13000, "16 more blades, +3 damage",
+          {"count": ("+", 16), "dmg": ("+", 3), "rate": ("*", 0.6), "dtype": ("=", "normal")})],
+        [("Inferno Ring", 3500, "+2 fire damage, faster",
+          {"dmg": ("+", 2), "rate": ("*", 0.7), "range": ("+", 15)}),
+         ("Sun Ring", 15000, "+5 damage, burns blimps",
+          {"dmg": ("+", 5), "rate": ("*", 0.5), "pierce": ("+", 5), "blimp_mult": ("=", 2)})],
+    ],
+    "boom": [
+        [("Steel Crescent", 3500, "2 steel rangs, +2 damage",
+          {"pierce": ("+", 15), "dmg": ("+", 2), "count": ("=", 2)}),
+         ("Eclipse Blade", 14000, "Pops 40 more, +5 damage",
+          {"pierce": ("+", 40), "dmg": ("+", 5), "blimp_mult": ("=", 3)})],
+        [("Gale Rangs", 3200, "Push back much further", {"knock": ("+", 20), "rate": ("*", 0.7)}),
+         ("Tempest Rangs", 13000, "Huge push, +4 damage",
+          {"knock": ("+", 30), "dmg": ("+", 4), "rate": ("*", 0.5), "pierce": ("+", 10)})],
+    ],
+    "bomb": [
+        [("Blimp Breaker", 4000, "+5 dmg, hits 15 more, 5x blimps",
+          {"dmg": ("+", 5), "blimp_mult": ("=", 5), "pierce": ("+", 15), "rate": ("*", 0.85)}),
+         ("Sky Shatter", 16000, "+15 dmg, hits 40 more, 8x blimps",
+          {"dmg": ("+", 15), "blimp_mult": ("=", 8), "blast": ("+", 20), "pierce": ("+", 40), "rate": ("*", 0.7)})],
+        [("Mega Clusters", 3000, "12 mini bombs, bigger blasts",
+          {"cluster": ("=", 12), "dmg": ("+", 1), "blast": ("+", 10), "pierce": ("+", 10)}),
+         ("Bomb Cascade", 13000, "20 mini bombs, much faster",
+          {"cluster": ("=", 20), "dmg": ("+", 3), "rate": ("*", 0.6), "pierce": ("+", 25)})],
+    ],
+    "glue": [
+        [("Corrosive Goo", 3200, "Acid 6x faster, slows more", {"acid": ("=", 0.25), "slow": ("=", 0.75)}),
+         ("Meltdown", 12000, "Acid melts layers nonstop", {"acid": ("=", 0.1), "pierce": ("+", 4)})],
+        [("Glue Typhoon", 3000, "Much bigger splash", {"splash": ("+", 40), "rate": ("*", 0.7)}),
+         ("Amber Trap", 11000, "Glue almost stops balloons",
+          {"splash": ("+", 60), "slow": ("=", 0.9), "glue_time": ("+", 8)})],
+    ],
+    "frost": [
+        [("Glacier Heart", 2800, "Freezes longer, +2 damage", {"freeze": ("+", 0.8), "dmg": ("+", 2)}),
+         ("Polar Core", 11000, "+5 damage, huge range",
+          {"freeze": ("+", 1.2), "dmg": ("+", 5), "range": ("+", 40), "rate": ("*", 0.7)})],
+        [("Frostbite", 2500, "+2 damage, longer slow", {"dmg": ("+", 2), "slow_after": ("+", 3)}),
+         ("Endless Winter", 10000, "+4 damage, freezes longer",
+          {"dmg": ("+", 4), "freeze": ("+", 1.0), "rate": ("*", 0.6)})],
+    ],
+    "ninja": [
+        [("Star Tempest", 4500, "6 stars, +1 damage", {"count": ("=", 6), "dmg": ("+", 1), "rate": ("*", 0.75)}),
+         ("Thousand Stars", 15000, "10 stars, +3 damage", {"count": ("=", 10), "dmg": ("+", 3), "pierce": ("+", 4)})],
+        [("Night Blade", 5000, "+4 damage, 3x vs blimps", {"dmg": ("+", 4), "blimp_mult": ("=", 3)}),
+         ("Grand Shadow", 16000, "+8 damage, twice as fast",
+          {"dmg": ("+", 8), "rate": ("*", 0.5), "stun": ("+", 0.5), "pierce": ("+", 4)})],
+    ],
+    "sniper": [
+        [("Blimp Piercer", 6000, "40 dmg, 6x blimps, faster",
+          {"dmg": ("=", 40), "blimp_mult": ("=", 6), "rate": ("*", 0.7)}),
+         ("One Shot", 22000, "120 dmg, 8x blimps, faster",
+          {"dmg": ("=", 120), "blimp_mult": ("=", 8), "rate": ("*", 0.5)})],
+        [("Full Auto", 6000, "Twice as fast, +2 damage", {"rate": ("*", 0.5), "dmg": ("+", 2)}),
+         ("Bullet Storm", 20000, "Even faster, +5 damage", {"rate": ("*", 0.4), "dmg": ("+", 5)})],
+    ],
+    "wizard": [
+        [("Storm Caller", 3500, "Lightning hits 16, +2 dmg", {"chain": ("=", 16), "dmg": ("+", 2)}),
+         ("Tempest Archmage", 14000, "Lightning hits 30, +5 dmg",
+          {"chain": ("=", 30), "dmg": ("+", 5), "rate": ("*", 0.6)})],
+        [("Inferno Wyrm", 3200, "Fire does 3 damage", {"breath_dmg": ("=", 3), "range": ("+", 20)}),
+         ("Dragon King", 13000, "Fire does 8 damage",
+          {"breath_dmg": ("=", 8), "dmg": ("+", 3), "rate": ("*", 0.6)})],
+    ],
+    "spike": [
+        [("Big Mines", 4000, "Piles pop 10 more, +2 dmg", {"pierce": ("+", 10), "dmg": ("+", 2)}),
+         ("Minefield", 15000, "Piles pop 30 more, +5 dmg", {"pierce": ("+", 30), "dmg": ("+", 5), "rate": ("*", 0.6)})],
+        [("Spike Rain", 6000, "Makes spikes much faster",
+          {"rate": ("*", 0.6), "pierce": ("+", 4), "pile_cap": ("=", 60)}),
+         ("Spike Apocalypse", 18000, "Spikes everywhere, +4 dmg",
+          {"rate": ("*", 0.5), "dmg": ("+", 4), "pierce": ("+", 10), "pile_cap": ("=", 100)})],
+    ],
+    "village": [
+        [("War Drums", 5000, "Towers in circle 30% faster", {"drums": ("=", 0.3)}),
+         ("Great Temple", 20000, "45% faster, +20% range", {"drums": ("=", 0.45), "boost": ("+", 0.2)})],
+        [("Trade Harbor", 6000, "+$800/round, 20% off", {"income": ("=", 800), "discount": ("=", 0.2)}),
+         ("Golden City", 22000, "+$2500/round, 25% off", {"income": ("=", 2500), "discount": ("=", 0.25)})],
+    ],
+    "super": [
+        [("Star Forge", 30000, "+4 damage, +5 pierce", {"dmg": ("+", 4), "pierce": ("+", 5), "rate": ("*", 0.8)}),
+         ("Cosmic Titan", 90000, "+12 damage, 4x vs blimps",
+          {"dmg": ("+", 12), "pierce": ("+", 10), "blimp_mult": ("=", 4)})],
+        [("Robo Guard", 22000, "3 beams, +2 damage", {"count": ("=", 3), "dmg": ("+", 2)}),
+         ("Mecha Sentinel", 65000, "4 beams, 8x vs blimps",
+          {"count": ("=", 4), "dmg": ("+", 6), "blimp_mult": ("=", 8)})],
+    ],
+    "mine": [
+        [("Mother Lode", 4500, "+$500 every round", {"income": ("+", 500)}),
+         ("Dragon's Hoard", 18000, "+$1800 every round", {"income": ("+", 1800)})],
+        [("Healing Spring", 4000, "+8 lives every round", {"lives": ("+", 8)}),
+         ("Fountain of Life", 15000, "+25 lives, double money", {"lives": ("+", 25), "mult": ("=", 2.0)})],
+    ],
+    "pirate": [
+        [("Warship", 3800, "6 cannonballs, +2 damage", {"count": ("=", 6), "dmg": ("+", 2)}),
+         ("Dread Armada", 15000, "10 cannonballs, +4 damage",
+          {"count": ("=", 10), "dmg": ("+", 4), "pierce": ("+", 4), "blimp_mult": ("=", 3)})],
+        [("Merchant Empire", 5000, "+$700 every round", {"income": ("=", 700)}),
+         ("Golden Armada", 18000, "+$2000/round, faster", {"income": ("=", 2000), "rate": ("*", 0.6)})],
+    ],
+    "sub": [
+        [("Torpedo Storm", 3800, "5 torpedoes, +2 damage", {"count": ("=", 5), "dmg": ("+", 2)}),
+         ("Leviathan", 15000, "8 torpedoes, +5 damage", {"count": ("=", 8), "dmg": ("+", 5), "pierce": ("+", 5)})],
+        [("Blimp Destroyer", 5000, "8x vs blimps, +2 damage", {"blimp_mult": ("=", 8), "dmg": ("+", 2)}),
+         ("Sky Hunter", 18000, "12x vs blimps, faster",
+          {"blimp_mult": ("=", 12), "dmg": ("+", 5), "rate": ("*", 0.6)})],
+    ],
+    "shark": [
+        [("Titan Bite", 4500, "+6 damage, 5x vs blimps", {"dmg": ("+", 6), "blimp_mult": ("=", 5)}),
+         ("Megalodon", 16000, "+15 damage, bites 6 more",
+          {"dmg": ("+", 15), "pierce": ("+", 6), "blimp_mult": ("=", 8)})],
+        [("Whirlpool", 3500, "Drags much further back", {"knock": ("+", 30), "pierce": ("+", 4)}),
+         ("Maelstrom", 13000, "Huge pull, bites 10 more",
+          {"knock": ("+", 50), "pierce": ("+", 10), "range": ("+", 30)})],
+    ],
+}
+for _tt in TOWER_TYPES:
+    _k = _tt["key"]
+    _tt["paths"][0] = _tt["paths"][0] + TIERS_4_5[_k][0]
+    _tt["paths"][1] = _tt["paths"][1][:2] + MIDDLE_TOP[_k]   # ability moves to tier 4
+    _tt["paths"][2] = _tt["paths"][2] + TIERS_4_5[_k][1]
+MAX_TIER = 5
 PATH_COLORS = [(255, 120, 80), (110, 220, 110), (90, 170, 255)]   # pips: top, middle, bottom
 
 # ---------------------------------------------------------------------
@@ -493,7 +691,10 @@ STAT_LABELS = [("dmg", "Damage"), ("pierce", "Pierce"), ("count", "Shots"), ("ra
                ("range", "Range"), ("blast", "Blast"), ("freeze", "Freeze"), ("chain", "Zaps"),
                ("knock", "Push"), ("glue_time", "Glue"), ("slow", "Slow"), ("life", "Spikes last"),
                ("income", "Income"), ("lives", "Lives"), ("boost", "Boost"), ("discount", "Discount"),
-               ("blimp_mult", "vs blimps")]
+               ("blimp_mult", "vs blimps"), ("ab_power", "Ability power"), ("ball_dmg", "Ball dmg"),
+               ("ball_pierce", "Ball pops"), ("ball_bounces", "Bounces"), ("breath_dmg", "Fire dmg"),
+               ("drums", "Speed boost"), ("pile_cap", "Max piles"), ("cluster", "Mini bombs"),
+               ("splash", "Splash"), ("acid", "Acid every")]
 FLAG_LABELS = {"camo": "sees camo", "homing": "homing", "spikeball": "Spike Ball", "breath": "flamethrower",
                "freeze_white": "freezes white", "radar": "camo radar", "rune": "lead popping",
                "glue_blimp": "glues blimps", "mines": "spike mines", "ability": "new ability", "acid": "acid"}
@@ -502,9 +703,9 @@ FLAG_LABELS = {"camo": "sees camo", "homing": "homing", "spikeball": "Spike Ball
 def fmt_stat(key, v):
     if key == "rate":
         return "%.1f/s" % (1.0 / v)
-    if key in ("slow", "boost", "discount"):
+    if key in ("slow", "boost", "discount", "drums"):
         return "%d%%" % round(v * 100)
-    if key in ("glue_time", "freeze", "life"):
+    if key in ("glue_time", "freeze", "life", "acid"):
         return "%.1fs" % v
     if key == "income":
         return "$%d" % v
@@ -882,7 +1083,7 @@ class Tower:
             for i in range(self.levels[p]):
                 for k, (op, v) in self.t["paths"][p][i][3].items():
                     if op == "+":
-                        s[k] = s.get(k, 0) + v
+                        s[k] = s.get(k, 1 if k == "ab_power" else 0) + v   # ability power starts at 1
                     elif op == "*":
                         s[k] = s.get(k, 1) * v
                     else:
@@ -898,13 +1099,13 @@ class Tower:
         """Returns 'ok', 'max', 'locked' (another path is at 3) or 'two'
         (two other paths are already upgraded) for upgrade path p."""
         lv = self.levels[p]
-        if lv >= 3:
+        if lv >= MAX_TIER:
             return "max"
         others = [self.levels[i] for i in range(len(self.levels)) if i != p]
         if lv == 0 and sum(1 for o in others if o) >= 2:
             return "two"
-        if lv + 1 == 3 and 3 in others:
-            return "locked"
+        if lv + 1 >= 3 and any(o >= 3 for o in others):
+            return "locked"   # only one path can go past level 2
         return "ok"
 
     def abilities(self):
@@ -1391,6 +1592,7 @@ class Game:
         self.rtime = 0.0
         self.speed = 1              # 1x / 2x / 3x
         self.rally_t = 0.0          # Rally Cry: all towers faster
+        self.rally_mult = 0.5
         self.ab_idx = 0             # which ability is picked in the ability bar
         self.auto = bool(self.app.save.get("auto_start"))
         self.auto_wait = 0.0        # countdown before an auto-started round
@@ -1709,7 +1911,7 @@ class Game:
         if t.frenzy_t > 0:
             rate *= t.frenzy_rate
         if self.rally_t > 0:
-            rate *= 0.5
+            rate *= self.rally_mult
         return rate
 
     # ---------------------------------------------------------- abilities
@@ -1728,64 +1930,71 @@ class Game:
         self.app.sounds.play("upgrade")
         s = t.s
         on_screen = [b for b in self.balloons if b.alive and MAP_Y - 10 < b.y < PANEL_Y + 10 and -10 < b.x < SCREEN_W + 10]
-        if aid in ("dart_storm", "overdrive"):
-            t.frenzy_t, t.frenzy_rate, t.frenzy_count = (6.0, 0.25, 3) if aid == "dart_storm" else (8.0, 1 / 3, 0)
+        P = s.get("ab_power", 1)   # 1 when unlocked at tier 4, 2 at tier 5
+        if aid == "dart_storm":
+            t.frenzy_t, t.frenzy_rate, t.frenzy_count = 6.0 + 4 * (P - 1), 0.25 / P, 3 + 2 * (P - 1)
+        elif aid in ("overdrive", "feeding_frenzy"):
+            t.frenzy_t, t.frenzy_rate, t.frenzy_count = 8.0 + 4 * (P - 1), 1 / (3 + P - 1), 0
         elif aid == "tack_nova":
-            for i in range(48):
-                a = i * 2 * math.pi / 48
-                self.projs.append(Proj("tack", t.x, t.y, a, 420, 0.9, max(1, s["dmg"]), 4, s["dtype"], 5, t))
+            n = 48 * P
+            for i in range(n):
+                a = i * 2 * math.pi / n
+                self.projs.append(Proj("tack", t.x, t.y, a, 420, 0.9, max(1, s["dmg"]) * P, 4 * P, s["dtype"], 5, t))
         elif aid == "rang_barrage":
-            for i in range(12):
+            n = 12 * P
+            for i in range(n):
                 sign = 1 if i % 2 else -1
-                pr = Proj("boom", t.x, t.y, i * math.pi / 6, s["speed"], 2 * math.pi * 70 / s["speed"],
-                          s["dmg"], s["pierce"] + 4, s["dtype"], 10, t)
+                pr = Proj("boom", t.x, t.y, i * 2 * math.pi / n, s["speed"], 2 * math.pi * 70 / s["speed"],
+                          s["dmg"] * P, s["pierce"] + 4 * P, s["dtype"], 10, t)
                 pr.turn = sign * s["speed"] / 70
                 self.projs.append(pr)
-        elif aid in ("carpet_bomb", "meteor"):
+        elif aid in ("carpet_bomb", "meteor", "depth_charge"):
             front = sorted(on_screen, key=lambda b: b.dist - b.path.total)
-            if aid == "meteor":
-                front = sorted(on_screen, key=lambda b: (-b.rank, b.dist - b.path.total))[:1]
-            for b in front[:8]:
-                boom = Proj("bomb", b.x, b.y, 0, 0, 0, 20 if aid == "meteor" else 4, 60 if aid == "meteor" else 30,
-                            "normal" if aid == "meteor" else "explode", 0, t)
-                boom.blast = 95 if aid == "meteor" else 70
+            if aid == "meteor":   # the strongest balloons (more meteors at tier 5)
+                front = sorted(on_screen, key=lambda b: (-b.rank, b.dist - b.path.total))
+            count, dmg, pierce, blast, dtype = {
+                "carpet_bomb": (8, 4, 30, 70, "normal"),
+                "meteor": (1, 20, 60, 95, "normal"),
+                "depth_charge": (6, 5, 30, 60, "normal")}[aid]
+            for b in front[:count * (P * 2 if aid == "meteor" else P)]:
+                boom = Proj("bomb", b.x, b.y, 0, 0, 0, dmg * P, pierce * P, dtype, 0, t)
+                boom.blast = blast + 15 * (P - 1)
                 boom.bm = 3
                 self.explode(boom)
         elif aid == "glue_rain":
             rain = dict(s, glue_blimp=True)
             for b in on_screen:
                 self.apply_glue(b, rain, t)
+                if P >= 2:
+                    self.damage(b, 2, "normal", None, t)
         elif aid == "blizzard":
             for b in on_screen:
-                b.frozen = max(b.frozen, 3.0)
+                b.frozen = max(b.frozen, 3.0 * P)
+                if P >= 2:
+                    self.damage(b, 3, "normal", None, t)
             self.add_fx("ring", SCREEN_W // 2, MAP_Y + MAP_H // 2, 0.5, (300, (200, 240, 255)))
         elif aid == "smoke_bomb":
             for b in on_screen:
                 if not b.info.get("blimp"):
-                    b.dist = max(0.0, b.dist - 90)
-                b.frozen = max(b.frozen, 1.5)
+                    b.dist = max(0.0, b.dist - 90 * P)
+                b.frozen = max(b.frozen, 1.5 * P)
         elif aid in ("cash_crate", "payday"):
-            cash = 300 if aid == "cash_crate" else 600
+            cash = {"cash_crate": (300, 1200), "payday": (600, 3000)}[aid][min(P, 2) - 1]
             self.money += cash
             self.add_fx("text", t.x, t.y - 20, 1.2, "+$%d" % cash)
         elif aid == "spike_carpet":
             self.make_spikes(t)   # makes sure the reachable spots are known
-            for x, y in random.sample(t.spots[1], min(25, len(t.spots[1]))):
-                self.spikes.append([x, y, t.s["pierce"], t.s["life"], t])
+            for x, y in random.sample(t.spots[1], min(25 * P, len(t.spots[1]))):
+                self.spikes.append([x, y, t.s["pierce"] * P, t.s["life"], t])
         elif aid == "rally_cry":
-            self.rally_t = 8.0
+            self.rally_t = 8.0 + 4 * (P - 1)
+            self.rally_mult = 0.5 if P == 1 else 0.4
         elif aid == "broadside":
-            for i in range(16):
-                pr = Proj("cannon", t.x, t.y, i * math.pi / 8, s["speed"], (s["range"] + 60) / s["speed"],
-                          s["dmg"], s["pierce"] + 2, s["dtype"], 6, t)
+            n = 16 * P
+            for i in range(n):
+                pr = Proj("cannon", t.x, t.y, i * 2 * math.pi / n, s["speed"], (s["range"] + 60) / s["speed"],
+                          s["dmg"] * P, s["pierce"] + 2 * P, s["dtype"], 6, t)
                 self.projs.append(pr)
-        elif aid == "depth_charge":
-            for b in sorted(on_screen, key=lambda b: b.dist - b.path.total)[:6]:
-                boom = Proj("bomb", b.x, b.y, 0, 0, 0, 5, 30, "explode", 0, t)
-                boom.blast, boom.bm = 60, 3
-                self.explode(boom)
-        elif aid == "feeding_frenzy":
-            t.frenzy_t, t.frenzy_rate, t.frenzy_count = 8.0, 1 / 3, 0
         else:
             self.hero_ability(t, aid, on_screen)
 
@@ -1842,7 +2051,7 @@ class Game:
                 t.cool2 = 0.12 if ft else 0.05
                 if ft:
                     a = math.atan2(ft.y - t.y, ft.x - t.x) + random.uniform(-0.15, 0.15)
-                    self.projs.append(Proj("fire", t.x, t.y, a, 320, 0.36, 1, 2, "magic", 8, t))
+                    self.projs.append(Proj("fire", t.x, t.y, a, 320, 0.36, s.get("breath_dmg", 1), 2, "magic", 8, t))
         t.cool -= dt
         if t.cool > 0:
             return
@@ -1868,8 +2077,9 @@ class Game:
             ax, ay = self.lead(t, tgt, 330)
             t.angle = math.atan2(ay - t.y, ax - t.x)
             ball = Proj("spikeball", t.x + math.cos(t.angle) * 16, t.y + math.sin(t.angle) * 16, t.angle,
-                        330, 8.0, 2, 40, "normal", 12, t)
-            ball.bounces = 1
+                        330, 8.0, s.get("ball_dmg", 2), s.get("ball_pierce", 40), "normal", 12, t)
+            ball.bounces = s.get("ball_bounces", 1)
+            ball.bm = s.get("blimp_mult", 1)
             self.projs.append(ball)
         elif t.key == "knight":   # sword slash: hits a group around the knight
             self.knight_slash(t, tgt)
@@ -1964,7 +2174,7 @@ class Game:
                     d += 10
             t.spots = (t.s["range"], spots)
         spots = t.spots[1]
-        if not spots or sum(1 for sp in self.spikes if sp[4] is t) >= 30:
+        if not spots or sum(1 for sp in self.spikes if sp[4] is t) >= t.s.get("pile_cap", 30):
             return
         x, y = random.choice(spots)
         self.spikes.append([x + random.uniform(-9, 9), y + random.uniform(-9, 9),
@@ -2383,7 +2593,7 @@ class Game:
             if state == "max":
                 self.toast("That path is maxed out")
             elif state == "locked":
-                self.toast("Only one path can reach level 3")
+                self.toast("Only one path can go past level 2")
             elif state == "two":
                 self.toast("Only 2 paths per tower")
             else:
@@ -2698,9 +2908,9 @@ class Game:
                 bx, by = t.x + math.cos(t.angle) * (length - 6), t.y + math.sin(t.angle) * (length - 6)
                 pygame.draw.line(surf, (60, 35, 15), (bx - px, by - py), (bx + px, by + py), 3)
         for p in range(len(t.levels)):
-            x0 = t.x - 20 + p * 14
-            for i in range(3):
-                rect = (x0 + i * 4, t.y + TOWER_R + 3, 3, 4)
+            x0 = t.x - 25 + p * 17
+            for i in range(MAX_TIER):
+                rect = (x0 + i * 3, t.y + TOWER_R + 3, 2, 4)
                 pygame.draw.rect(surf, PATH_COLORS[p] if i < t.levels[p] else (40, 40, 40), rect)
 
     def draw_fx(self, surf):
@@ -2871,7 +3081,7 @@ class Game:
             if state == "max":
                 rows.append(("Path %s: MAX" % "ABC"[p], GRAY, "Fully upgraded"))
             elif state == "locked":
-                rows.append(("Path %s: locked" % "ABC"[p], GRAY, "Only one path can reach level 3"))
+                rows.append(("Path %s: locked" % "ABC"[p], GRAY, "Another path is past level 2"))
             elif state == "two":
                 rows.append(("Path %s: closed" % "ABC"[p], GRAY, "Only 2 paths per tower"))
             else:
@@ -2923,8 +3133,8 @@ class Game:
                 pygame.draw.rect(surf, YELLOW, (14, ry - 2, SCREEN_W - 28, 31), 2, border_radius=6)
             surf.blit(app.text(app.f_norm, label, col), (24, ry + 3))
             if i < len(t.t["paths"]):
-                for k in range(3):
-                    rect = (SCREEN_W - 70 + k * 14, ry + 9, 10, 10)
+                for k in range(MAX_TIER):
+                    rect = (SCREEN_W - 84 + k * 13, ry + 10, 9, 9)
                     pygame.draw.rect(surf, PATH_COLORS[i], rect, 0 if k < t.levels[i] else 2)
 
     def draw_overlay(self, surf):
@@ -3488,24 +3698,25 @@ class App:
                 surf.blit(self.text(self.f_small, "%s  -  recharges in %ds" % (desc, cd), (190, 200, 220)), (28, y + 36))
                 y += 76
         else:
-            names = ("Top path", "Middle path (ability)", "Bottom path")
+            names = ("Top path", "Middle path (ability at level 4)", "Bottom path")
             for p, path in enumerate(tt["paths"]):
-                surf.blit(self.text(self.f_small, names[p], PATH_COLORS[p]), (14, y))
+                surf.blit(self.text(self.f_small, names[p], PATH_COLORS[p]), (12, y))
                 y += 22
                 for k, (name, cost, desc, fx) in enumerate(path):
-                    card = pygame.Rect(10 + k * 156, y, 150, 86)
-                    pygame.draw.rect(surf, (45, 52, 80), card, border_radius=10)
-                    pygame.draw.rect(surf, PATH_COLORS[p], card, 2, border_radius=10)
-                    title = ("* " if "ability" in fx else "") + name
-                    surf.blit(self.text(self.f_tiny, "LV %d" % (k + 1), PATH_COLORS[p]), (card.x + 8, card.y + 6))
+                    card = pygame.Rect(4 + k * 95, y, 91, 98)
+                    pygame.draw.rect(surf, (55, 62, 95) if k >= 3 else (45, 52, 80), card, border_radius=8)
+                    pygame.draw.rect(surf, PATH_COLORS[p], card, 3 if k >= 3 else 2, border_radius=8)
+                    surf.blit(self.text(self.f_tiny, "LV%d" % (k + 1), PATH_COLORS[p]), (card.x + 5, card.y + 4))
                     cost_img = self.text(self.f_tiny, "$%d" % cost, GREEN)
-                    surf.blit(cost_img, (card.right - cost_img.get_width() - 8, card.y + 6))
-                    tfont = self.f_small if self.f_small.size(title)[0] <= 134 else self.f_tiny
-                    surf.blit(self.text(tfont, title, YELLOW if "ability" in fx else WHITE), (card.x + 8, card.y + 22))
-                    for j, line in enumerate(self.wrap(desc, self.f_tiny, 136)[:3]):
-                        surf.blit(self.text(self.f_tiny, line, (190, 200, 220)), (card.x + 8, card.y + 46 + j * 14))
-                y += 96
-            surf.blit(self.text(self.f_tiny, "* = ability (use with L + R).  Only 2 paths per tower; one can reach level 3.",
+                    surf.blit(cost_img, (card.right - cost_img.get_width() - 5, card.y + 4))
+                    ab = "ability" in fx or "ab_power" in fx
+                    title = ("* " if ab else "") + name
+                    for j, line in enumerate(self.wrap(title, self.f_tiny, 83)[:2]):
+                        surf.blit(self.text(self.f_tiny, line, YELLOW if ab else WHITE), (card.x + 5, card.y + 20 + j * 14))
+                    for j, line in enumerate(self.wrap(desc, self.f_tiny, 83)[:3]):
+                        surf.blit(self.text(self.f_tiny, line, (180, 190, 215)), (card.x + 5, card.y + 52 + j * 14))
+                y += 106
+            surf.blit(self.text(self.f_tiny, "* = ability (L + R).  One path can reach 5, another up to 2.",
                                 (160, 170, 200)), (12, y))
         pygame.draw.rect(surf, (22, 25, 38), (0, SCREEN_H - 30, SCREEN_W, 30))
         img = self.text(self.f_small, "L / R: switch tab     B: back to " + ("game" if self.guide_back == "game" else "menu"),
@@ -3565,8 +3776,8 @@ class App:
         ("L + R together: use abilities", WHITE),
         ("", WHITE),
         ("TIPS", YELLOW),
-        ("Middle path level 3 = an ability.", WHITE),
-        ("Only 2 paths per tower; one can reach 3.", WHITE),
+        ("Middle path level 4 = an ability.", WHITE),
+        ("One path can reach 5, another up to 2.", WHITE),
         ("One hero per game; it levels up to 20.", WHITE),
         ("Ships, subs and sharks go on water.", WHITE),
         ("Lead: bombs, fire or magic. Purple: no magic.", WHITE),

@@ -36,21 +36,34 @@ emulator in [`../pc-tester`](../pc-tester).
 The game **saves after every round**. Pick **Continue** on the title screen to
 carry on where you left off (a game over clears the save).
 
-### Upgrades: 3 paths
+### Upgrades: 3 paths, 5 tiers
 
-Every tower has **three upgrade paths with 3 levels each**:
+Every tower has **three upgrade paths with 5 tiers each** (that's 15 upgrades per tower):
 
 - **Top (orange)** and **bottom (blue)**: stronger attacks, range, camo and so on.
-- **Middle (green)**: its **level 3 unlocks an ability** you fire yourself.
-- Only **2 paths per tower** can be upgraded, and only **one** of them can reach level 3.
+- **Middle (green)**: **tier 4 unlocks an ability** you fire yourself, and **tier 5
+  powers that ability up** (more tacks, longer freezes, bigger paydays...).
+- **One path can go all the way to tier 5**, and a second path can go up to tier 2.
+- Tiers get expensive fast: each one costs about 2.5-4x the one before. Tier 4 is a
+  mid-game goal and tier 5 is a late-game prize. Some examples:
+
+| Tower | Top path tier 4 / 5 | Middle tier 4 (ability) / 5 | Bottom path tier 4 / 5 |
+|---|---|---|---|
+| Dart Tower | Iron Boulder $3,200 / Doom Boulder $14,000 | Dart Storm $2,800 / Eye of the Storm $12,000 | Dart Gunner $2,600 / Dart Hurricane $11,000 |
+| Wizard | Storm Caller $3,500 / Tempest Archmage $14,000 | Meteor $4,000 / Starfall $15,000 | Inferno Wyrm $3,200 / Dragon King $13,000 |
+| Shark | Titan Bite $4,500 / Megalodon $16,000 | Feeding Frenzy $3,500 / Apex Predator $13,000 | Whirlpool $3,500 / Maelstrom $13,000 |
+| Coin Mine | Mother Lode $4,500 / Dragon's Hoard $18,000 | Payday $4,500 / Jackpot $16,000 | Healing Spring $4,000 / Fountain of Life $15,000 |
+
+See every upgrade in **Towers & Heroes** on the main menu (or **Tower guide** in the game menu).
 
 Before you buy, the menu shows exactly what an upgrade changes, like
 `> Pierce 3>5, Speed 1.2/s>1.5/s`.
 
 ### Abilities
 
-Press **L + R** to open the ability bar, pick one with left/right, and press **A**.
-Each one then recharges (shown as a countdown on its button).
+Abilities unlock at **middle tier 4**. Press **L + R** to open the ability bar, pick one with
+left/right, and press **A**. Each one then recharges (shown as a countdown on its button).
+At middle **tier 5** every ability gets much stronger.
 
 | Tower | Ability | What it does |
 |---|---|---|
