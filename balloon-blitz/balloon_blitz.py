@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v4.0 (16 towers, 5 tiers, 5 heroes, 8 maps)"
+VERSION = "v4.1 (16 towers, 5 tiers, 5 heroes, 8 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -110,6 +110,11 @@ BALLOON_TYPES = {
 BALLOON_ORDER = list(BALLOON_TYPES)   # used for "Strong" targeting
 for _info in BALLOON_TYPES.values():
     _info.setdefault("immune", set())
+
+# Sandbox tools: balloon kinds you can send, and how many at once.
+SANDBOX_FLAGS = [("Normal", ""), ("Camo", "c"), ("Regrow", "r"), ("Fortified", "f"),
+                 ("Camo + Regrow", "cr"), ("Camo + Fortified", "cf")]
+SANDBOX_AMOUNTS = [1, 5, 10, 25, 50]
 
 # Regrow balloons grow back one layer at a time along this chain.
 REGROW_UP = {"red": "blue", "blue": "green", "green": "yellow", "yellow": "pink"}
@@ -789,6 +794,7 @@ DIFFICULTIES = [
     dict(name="Easy", lives=200, cost=0.8, speed=0.9, money=850),
     dict(name="Normal", lives=150, cost=1.0, speed=1.0, money=START_MONEY),
     dict(name="Hard", lives=100, cost=1.08, speed=1.1, money=START_MONEY),
+    dict(name="Sandbox", lives=999999, cost=1.0, speed=1.0, money=999999, sandbox=True),   # for testing
 ]
 
 # =====================================================================
@@ -1593,6 +1599,9 @@ class Game:
         self.speed = 1              # 1x / 2x / 3x
         self.rally_t = 0.0          # Rally Cry: all towers faster
         self.rally_mult = 0.5
+        self.sandbox = bool(self.diff.get("sandbox"))
+        self.sb = dict(kind=BALLOON_ORDER.index("ceramic"), flags=0, amount=2, round=25)
+        self.sb_spawns = []         # sandbox balloons waiting to come out: [seconds, name, flags]
         self.ab_idx = 0             # which ability is picked in the ability bar
         self.auto = bool(self.app.save.get("auto_start"))
         self.auto_wait = 0.0        # countdown before an auto-started round
@@ -1774,10 +1783,11 @@ class Game:
                 t.xp += 30 + 3 * self.round
         self.check_hero_levels()
         self.lives += lives
-        self.app.record_best(self.map_idx, self.diff_idx, self.round)
-        self.app.save_resume(self.snapshot())
+        if not self.sandbox:   # sandbox games don't count or overwrite your saved game
+            self.app.record_best(self.map_idx, self.diff_idx, self.round)
+            self.app.save_resume(self.snapshot())
         self.toast("Round %d done! +$%d" % (self.round, bonus + income))
-        if self.round == WIN_ROUND and not self.won:
+        if self.round == WIN_ROUND and not self.won and not self.sandbox:
             self.won = True
             self.overlay, self.over_idx = "win", 0
         if self.auto:
@@ -2265,6 +2275,14 @@ class Game:
 
     # ---------------------------------------------------------- simulate
     def step(self, dt):
+        if self.sandbox:   # endless money and lives
+            self.money = max(self.money, 999999)
+            self.lives = 999999
+            for sp in self.sb_spawns:
+                sp[0] -= dt
+            for _, name, flags in [sp for sp in self.sb_spawns if sp[0] <= 0]:
+                self.spawn_balloon(name, 0.0, "c" in flags, regrow=name if "r" in flags else None, fort="f" in flags)
+            self.sb_spawns = [sp for sp in self.sb_spawns if sp[0] > 0]
         if self.active:
             self.rtime += dt
             while self.qi < len(self.queue) and self.queue[self.qi][0] <= self.rtime:
@@ -2619,8 +2637,17 @@ class Game:
 
     def overlay_items(self):
         if self.overlay == "pause":
-            return ["Resume", "Auto-start: %s" % ("ON" if self.auto else "OFF"), SOUND_ROW,
-                    "Tower guide", "Restart", "Quit to title"]
+            return ["Resume"] + (["Sandbox tools"] if self.sandbox else []) + [
+                "Auto-start: %s" % ("ON" if self.auto else "OFF"), SOUND_ROW,
+                "Tower guide", "Restart", "Quit to title"]
+        if self.overlay == "sandbox":
+            sb = self.sb
+            return ["Balloon: < %s >" % BALLOON_ORDER[sb["kind"]].capitalize(),
+                    "Type: < %s >" % SANDBOX_FLAGS[sb["flags"]][0],
+                    "Amount: < %d >" % SANDBOX_AMOUNTS[sb["amount"]],
+                    "Send balloons!",
+                    "Jump to round: < %d >" % sb["round"],
+                    "Pop everything", "Recharge abilities", "Back"]
         if self.overlay == "win":
             return ["Keep playing", "Quit to title"]
         return ["Try again", "Quit to title"]
@@ -2633,6 +2660,9 @@ class Game:
             self.over_idx = (self.over_idx + 1) % len(items)
         if self.overlay == "pause" and ("B" in inp.pressed or "START" in inp.pressed):
             self.overlay = None
+            return
+        if self.overlay == "sandbox":
+            self.update_sandbox(inp, items[self.over_idx])
             return
         choice = items[self.over_idx]
         if choice == SOUND_ROW:
@@ -2651,6 +2681,8 @@ class Game:
             self.app.set_auto_start(self.auto)
             if self.auto and self.round > 0 and not self.active:
                 self.auto_wait = AUTO_START_DELAY
+        elif choice == "Sandbox tools":
+            self.overlay, self.over_idx = "sandbox", 3   # start on "Send balloons!"
         elif choice == "Tower guide":   # look up upgrades without leaving the game
             key = self.sel.key if self.sel and self.mode == "menu" else SHOP[self.shop]["key"]
             self.app.open_guide(key, back="game")
@@ -2658,6 +2690,48 @@ class Game:
             self.reset()
         elif choice == "Quit to title":
             self.app.go_title()
+
+    def update_sandbox(self, inp, choice):
+        sb = self.sb
+        step = ("RIGHT" in inp.repeat) - ("LEFT" in inp.repeat)
+        if "B" in inp.pressed or ("A" in inp.pressed and choice == "Back"):
+            self.overlay, self.over_idx = "pause", 1
+            return
+        if step:
+            if choice.startswith("Balloon"):
+                sb["kind"] = (sb["kind"] + step) % len(BALLOON_ORDER)
+            elif choice.startswith("Type"):
+                sb["flags"] = (sb["flags"] + step) % len(SANDBOX_FLAGS)
+            elif choice.startswith("Amount"):
+                sb["amount"] = (sb["amount"] + step) % len(SANDBOX_AMOUNTS)
+            elif choice.startswith("Jump"):
+                sb["round"] = max(1, min(50, sb["round"] + step))
+        if "A" not in inp.pressed:
+            return
+        if choice == "Send balloons!":
+            name, flags = BALLOON_ORDER[sb["kind"]], SANDBOX_FLAGS[sb["flags"]][1]
+            gap = 1.0 if BALLOON_TYPES[name].get("blimp") else 0.25
+            for i in range(SANDBOX_AMOUNTS[sb["amount"]]):
+                self.sb_spawns.append([i * gap, name, flags])
+            self.toast("Sending %d %s" % (SANDBOX_AMOUNTS[sb["amount"]], name), 1.2)
+            self.overlay = None
+        elif choice.startswith("Jump"):
+            self.queue, self.qi = [], 0
+            self.round = sb["round"] - 1
+            self.start_round()
+            self.toast("Round %d" % self.round, 1.2)
+            self.overlay = None
+        elif choice == "Pop everything":
+            for b in self.balloons:
+                b.alive = False
+                self.add_fx("pop", b.x, b.y, 0.32, (b.info["color"], b.id))
+            self.balloons, self.sb_spawns = [], []
+            self.queue, self.qi = [], 0
+            self.toast("All clear!", 1.0)
+        elif choice == "Recharge abilities":
+            for t in self.towers:
+                t.ab_cool.clear()
+            self.toast("Abilities ready!", 1.0)
 
     # ---------------------------------------------------------- drawing
     def draw(self, surf):
@@ -2965,7 +3039,7 @@ class Game:
         pygame.draw.circle(surf, RED, (14, 17), 7)
         pygame.draw.circle(surf, RED, (26, 17), 7)
         pygame.draw.polygon(surf, RED, [(7, 19), (33, 19), (20, 33)])
-        surf.blit(app.text(app.f_norm, str(self.lives), WHITE), (40, 8))
+        surf.blit(app.text(app.f_norm, "inf" if self.sandbox else str(self.lives), WHITE), (40, 8))
         # coin
         pygame.draw.circle(surf, YELLOW, (130, 20), 11)
         pygame.draw.circle(surf, (180, 140, 30), (130, 20), 11, 2)
@@ -3142,17 +3216,19 @@ class Game:
         surf.blit(app.dim, (0, 0))
         if self.overlay == "pause":
             title, sub = "Paused", "Round %d" % max(1, self.round)
+        elif self.overlay == "sandbox":
+            title, sub = "Sandbox Tools", "LEFT/RIGHT: change    A: do it"
         elif self.overlay == "over":
             title, sub = "Game Over", "You made it to round %d" % self.round
         else:
             title, sub = "You Win!", "All %d rounds beaten!" % WIN_ROUND
         items = self.overlay_items()
-        top = 190 if len(items) <= 4 else 140   # long menus start higher so they fit
+        top = 190 if len(items) <= 4 else 140 if len(items) <= 6 else 90   # long menus start higher
         img = app.text(app.f_big, title, YELLOW)
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, top)))
         img = app.text(app.f_norm, sub, WHITE)
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, top + 55)))
-        app.draw_menu_list(surf, items, self.over_idx, top + 110, 52 if len(items) <= 4 else 50)
+        app.draw_menu_list(surf, items, self.over_idx, top + 110, 52 if len(items) <= 4 else 50 if len(items) <= 6 else 44)
 
 
 # =====================================================================
@@ -3616,6 +3692,7 @@ class App:
         # difficulty
         diff = DIFFICULTIES[self.diff_idx]
         self.draw_button(surf, (90, 426, 300, 58), "< %s >" % diff["name"], row == "mode", (70, 90, 150),
+                         "Endless money and lives" if diff.get("sandbox") else
                          "%d lives  -  $%d to start" % (diff["lives"], diff["money"] + mp.get("extra_money", 0)))
         self.draw_button(surf, (90, 500, 300, 56), "START!", row == "start", (60, 160, 70))
         self.draw_button(surf, (170, 572, 140, 42), "Back", row == "back", (90, 90, 110))

@@ -30,6 +30,10 @@ emulator in [`../pc-tester`](../pc-tester).
   The Tower guide opens on the tower you're looking at; B takes you back to your paused game.
 - Beat **round 30** to win, then keep going in freeplay.
 - **Easy** starts with $850 (instead of $650), slower balloons and cheaper towers.
+- **Sandbox** (pick it as the difficulty) is for testing: endless money and lives, and
+  **Sandbox tools** in the B menu let you send any balloon (camo / regrow / fortified, 1-50
+  at a time), jump to any round 1-50, pop everything and recharge abilities. Sandbox
+  games never overwrite your saved game or best rounds.
 
 ### Saving
 
