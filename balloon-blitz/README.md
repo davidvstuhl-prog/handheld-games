@@ -25,7 +25,8 @@ emulator in [`../pc-tester`](../pc-tester).
 - **START** sends the next round (and pauses during a round).
 - **SELECT** changes the speed: **1x → 2x → 3x**.
 - **L + R together** (or **D** on a keyboard) opens the **ability bar**.
-- **B** opens the game menu (auto-start, sound slider, restart, quit).
+- **B** opens the game menu (auto-start, sound slider, **Tower guide**, restart, quit).
+  The Tower guide opens on the tower you're looking at; B takes you back to your paused game.
 - Beat **round 30** to win, then keep going in freeplay.
 - **Easy** starts with $850 (instead of $650), slower balloons and cheaper towers.
 

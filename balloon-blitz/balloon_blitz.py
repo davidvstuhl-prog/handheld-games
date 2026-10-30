@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v3.1 (16 towers, 5 heroes, 8 maps)"
+VERSION = "v3.2 (16 towers, 5 heroes, 8 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -2405,7 +2405,7 @@ class Game:
     def overlay_items(self):
         if self.overlay == "pause":
             return ["Resume", "Auto-start: %s" % ("ON" if self.auto else "OFF"), SOUND_ROW,
-                    "Restart", "Quit to title"]
+                    "Tower guide", "Restart", "Quit to title"]
         if self.overlay == "win":
             return ["Keep playing", "Quit to title"]
         return ["Try again", "Quit to title"]
@@ -2436,6 +2436,9 @@ class Game:
             self.app.set_auto_start(self.auto)
             if self.auto and self.round > 0 and not self.active:
                 self.auto_wait = AUTO_START_DELAY
+        elif choice == "Tower guide":   # look up upgrades without leaving the game
+            key = self.sel.key if self.sel and self.mode == "menu" else SHOP[self.shop]["key"]
+            self.app.open_guide(key, back="game")
         elif choice in ("Restart", "Try again"):
             self.reset()
         elif choice == "Quit to title":
@@ -2906,11 +2909,13 @@ class Game:
             title, sub = "Game Over", "You made it to round %d" % self.round
         else:
             title, sub = "You Win!", "All %d rounds beaten!" % WIN_ROUND
+        items = self.overlay_items()
+        top = 190 if len(items) <= 4 else 140   # long menus start higher so they fit
         img = app.text(app.f_big, title, YELLOW)
-        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 190)))
+        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, top)))
         img = app.text(app.f_norm, sub, WHITE)
-        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 245)))
-        app.draw_menu_list(surf, self.overlay_items(), self.over_idx, 300)
+        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, top + 55)))
+        app.draw_menu_list(surf, items, self.over_idx, top + 110, 52 if len(items) <= 4 else 50)
 
 
 # =====================================================================
@@ -2981,6 +2986,7 @@ class App:
         self.play_idx = 2        # play screen: START
         self.set_idx = 0
         self.tab_idx = 0         # Towers & Heroes screen
+        self.guide_back = "title"
         self._previews = {}
 
     # ---------------------------------------------------------- caches
@@ -3284,7 +3290,7 @@ class App:
         elif row == "settings":
             self.state, self.set_idx = "settings", 0
         elif row == "towers":
-            self.state = "towers"
+            self.open_guide(back="title")
         elif row == "help":
             self.state = "help"
         elif row == "quit":
@@ -3389,6 +3395,13 @@ class App:
                 line = w
         return lines + [line] if line else lines
 
+    def open_guide(self, key=None, back="title"):
+        """Open the Towers & Heroes screen (from the main menu or the in-game menu)."""
+        if key:
+            self.tab_idx = [tt["key"] for tt in SHOP].index(key)
+        self.guide_back = back
+        self.state = "towers"
+
     def update_towers(self, dt):
         inp = self.inp
         if "L" in inp.repeat or "LEFT" in inp.repeat or "UP" in inp.repeat:
@@ -3396,7 +3409,7 @@ class App:
         if "R" in inp.repeat or "RIGHT" in inp.repeat or "DOWN" in inp.repeat:
             self.tab_idx = (self.tab_idx + 1) % len(SHOP)
         if "B" in inp.pressed or "A" in inp.pressed:
-            self.state = "title"
+            self.state = self.guide_back   # back to the main menu, or to the paused game
 
     def draw_towers(self, surf):
         surf.fill((30, 34, 50))
@@ -3468,7 +3481,8 @@ class App:
             surf.blit(self.text(self.f_tiny, "* = ability (use with L + R).  Only 2 paths per tower; one can reach level 3.",
                                 (160, 170, 200)), (12, y))
         pygame.draw.rect(surf, (22, 25, 38), (0, SCREEN_H - 30, SCREEN_W, 30))
-        img = self.text(self.f_small, "L / R: switch tab     B: back", (200, 205, 225))
+        img = self.text(self.f_small, "L / R: switch tab     B: back to " + ("game" if self.guide_back == "game" else "menu"),
+                        (200, 205, 225))
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, SCREEN_H - 15)))
 
     # ----- settings
