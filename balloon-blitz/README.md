@@ -4,7 +4,18 @@ A balloon-popping tower defense game (inspired by Bloons TD 6) for the
 homemade Raspberry Pi handheld. To play it on a computer, use the
 emulator in [`../pc-tester`](../pc-tester).
 
-## Home screen
+## Share it with friends (no Python needed)
+
+GitHub builds ready-to-play versions automatically every time the game changes:
+**Windows** (`BalloonBlitz.exe`), **Mac** (`BalloonBlitz.app`) and **Linux**.
+They're on the [**PC build** release](../../../releases/tag/pc-latest). Download the zip for your
+computer, unzip it and double-click **BalloonBlitz**. `PLAYING.txt` inside explains the keys.
+
+- Windows may say "Windows protected your PC": click **More info** then **Run anyway**
+  (the game just isn't signed by a company).
+- Mac: the first time, right-click the app, choose **Open**, then **Open** again.
+- F11 switches fullscreen, and the window can be resized.
+
 
 - **Continue**: carry on your saved game (shown when you have one)
 - **Play**: pick a map (left/right flips through them, with a picture, difficulty badge
@@ -14,6 +25,26 @@ emulator in [`../pc-tester`](../pc-tester).
   stats and abilities as it levels up
 - **Settings**: auto-start, sound slider and the button test
 - **How to Play** and **Quit**
+
+## Modifiers
+
+Pick one on the Play screen under the difficulty for an extra challenge:
+
+| Difficulty | Modifiers |
+|---|---|
+| Easy | **No Heroes**, **3/4 Cash** |
+| Normal | **Few Upgrades** (max 4 per tower), **Tier 3 Max**, **Classic Six** (only Dart, Tack, Bomb, Frost, Sniper, Coin Mine) |
+| Hard | **Hardcore** (1 life), **Half Cash**, **Quarter Cash**, **No Cash Gain**, **No Abilities**, **Seven Towers** (max 7 at once), **Fortune Run** (start with $50,000, earn nothing, survive to round 50) |
+
+Cash modifiers change all money you earn (pops, round bonuses, mines, abilities);
+selling still gives your money back.
+
+## Achievements
+
+34 achievements, from **First Pop** to **Champion** (beat round 150), popping each
+boss blimp, maxing a tower to tier 5, getting a hero to level 20, winning on all 8 maps,
+and beating every modifier. A banner pops up when you unlock one, and **Achievements** on
+the main menu shows them all. Sandbox games don't count.
 
 ## How to play
 

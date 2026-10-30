@@ -1,0 +1,115 @@
+# Builds Balloon Blitz into programs your friends can just download and play
+# (no Python needed): Windows .exe, Mac .app and Linux.
+# Runs whenever the game changes, or by hand from the Actions tab.
+# The zips are attached to the "PC build" release.
+name: Build PC game
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "balloon-blitz/**"
+      - ".github/workflows/build-pc.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to update the download release
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: Mac
+          - os: ubuntu-latest
+            name: Linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pygame and PyInstaller
+        run: pip install pygame pyinstaller pillow
+
+      - name: Build the program
+        working-directory: balloon-blitz
+        run: |
+          if [ "${{ matrix.name }}" = "Mac" ]; then
+            MODE=--onedir     # a normal .app bundle
+          else
+            MODE=--onefile    # a single file to double-click
+          fi
+          pyinstaller $MODE --windowed --noconfirm --name BalloonBlitz \
+            --icon icon.png --collect-data pygame balloon_blitz.py
+
+      - name: Check it starts
+        working-directory: balloon-blitz
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          case "${{ matrix.name }}" in
+            Windows) ./dist/BalloonBlitz.exe --smoke-test --mute ;;
+            Mac)     ./dist/BalloonBlitz.app/Contents/MacOS/BalloonBlitz --smoke-test --mute ;;
+            Linux)   ./dist/BalloonBlitz --smoke-test --mute ;;
+          esac
+          echo "The game started and closed normally."
+
+      - name: Pack it into a zip
+        working-directory: balloon-blitz
+        run: |
+          mkdir -p out/BalloonBlitz
+          cp PLAYING.txt out/BalloonBlitz/
+          case "${{ matrix.name }}" in
+            Windows) cp dist/BalloonBlitz.exe out/BalloonBlitz/
+                     (cd out && 7z a ../BalloonBlitz-Windows.zip BalloonBlitz) ;;
+            Mac)     cp -R dist/BalloonBlitz.app out/BalloonBlitz/
+                     (cd out && ditto -c -k --keepParent BalloonBlitz ../BalloonBlitz-Mac.zip) ;;
+            Linux)   cp dist/BalloonBlitz out/BalloonBlitz/
+                     (cd out && zip -r ../BalloonBlitz-Linux.zip BalloonBlitz) ;;
+          esac
+          ls -l BalloonBlitz-*.zip
+
+      - name: Save the zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: BalloonBlitz-${{ matrix.name }}
+          path: balloon-blitz/BalloonBlitz-${{ matrix.name }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Collect the zips
+        uses: actions/download-artifact@v4
+        with:
+          path: zips
+          merge-multiple: true
+
+      - name: Put them on the download page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=pc-latest
+          NOTES="Balloon Blitz for PC (from commit ${GITHUB_SHA::7}). Download the zip for your computer, unzip it, and double-click BalloonBlitz. See PLAYING.txt inside for controls."
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --notes "$NOTES"
+          else
+            gh release create "$TAG" --title "PC build" --notes "$NOTES" --target "$GITHUB_SHA"
+          fi
+          gh release upload "$TAG" zips/*.zip --clobber

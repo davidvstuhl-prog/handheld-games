@@ -1,0 +1,36 @@
+BALLOON BLITZ - a balloon-popping tower defense game
+=====================================================
+
+HOW TO START
+  Windows: double-click BalloonBlitz.exe
+           (if Windows says "Windows protected your PC", click "More info"
+           then "Run anyway" - the game isn't signed by a company, that's all)
+  Mac:     double-click BalloonBlitz.app
+           (first time: right-click it, choose "Open", then "Open" again)
+  Linux:   run ./BalloonBlitz
+
+KEYBOARD
+  Arrow keys .... move the cursor / choose in menus
+  Z (or Space) .. A: build, open a tower's menu, OK
+  X ............. B: back / game menu
+  A / S ......... L / R: pick a tower to build (and switch tabs)
+  Enter ......... START: send the next round / pause
+  Tab ........... SELECT: game speed 1x / 2x / 3x
+  D ............. abilities (or press A and S together)
+  F11 ........... fullscreen on / off
+  Esc ........... pause / back
+
+  The window can be resized or maximized. A game controller works too.
+
+THE BASICS
+  - Balloons follow the track. Pop them before they reach the end!
+  - Pick a tower with A/S, move the cursor and press Z to build it.
+  - Press Z on a tower to upgrade it. Every tower has 3 paths with 5 tiers.
+    The middle path's tier 4 unlocks an ability.
+  - Beat round 30 to win, and keep going all the way to round 150.
+  - Try the modifiers on the Play screen (like Hardcore or Fortune Run)
+    and collect all the achievements.
+  - The game saves after every round. Pick "Continue" to keep playing.
+
+Your saves and achievements are kept in a file called .balloon_blitz.json
+in your user folder.

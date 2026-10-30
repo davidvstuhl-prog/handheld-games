@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v4.2 (150 rounds, 16 towers, 5 heroes, 8 maps)"
+VERSION = "v5.0 (150 rounds, modifiers, achievements)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -121,6 +121,66 @@ BALLOON_TYPES = {
 BALLOON_ORDER = list(BALLOON_TYPES)   # used for "Strong" targeting
 for _info in BALLOON_TYPES.values():
     _info.setdefault("immune", set())
+
+# ---------------------------------------------------------------------
+# Modifiers: optional challenges, picked per difficulty on the Play screen.
+# (id, name, description)
+# ---------------------------------------------------------------------
+MODIFIERS = {
+    "Easy": [("none", "No modifier", "Play normally"),
+             ("no_hero", "No Heroes", "Heroes can't be bought"),
+             ("cash75", "3/4 Cash", "You earn 75% of the money")],
+    "Normal": [("none", "No modifier", "Play normally"),
+               ("few_upgrades", "Few Upgrades", "Max 4 upgrades per tower"),
+               ("tier3", "Tier 3 Max", "Upgrades stop at tier 3"),
+               ("classic6", "Classic Six", "Only the original 6 towers")],
+    "Hard": [("none", "No modifier", "Play normally"),
+             ("hardcore", "Hardcore", "Only 1 life"),
+             ("cash50", "Half Cash", "You earn 50% of the money"),
+             ("cash25", "Quarter Cash", "You earn 25% of the money"),
+             ("no_cash", "No Cash Gain", "Only your starting money"),
+             ("no_abilities", "No Abilities", "Abilities are turned off"),
+             ("seven", "Seven Towers", "Max 7 towers at once"),
+             ("fortune", "Fortune Run", "$50,000, earn nothing, reach round 50")],
+    "Sandbox": [("none", "No modifier", "Endless money and lives")],
+}
+MOD_RULES = {
+    "none": {}, "no_hero": {"no_hero": True}, "cash75": {"cash_mult": 0.75},
+    "few_upgrades": {"max_upgrades": 4}, "tier3": {"max_tier": 3},
+    "classic6": {"towers": ("dart", "tack", "bomb", "frost", "sniper", "mine"), "no_hero": True},
+    "hardcore": {"lives": 1}, "cash50": {"cash_mult": 0.5}, "cash25": {"cash_mult": 0.25},
+    "no_cash": {"cash_mult": 0.0}, "no_abilities": {"no_abilities": True}, "seven": {"max_towers": 7},
+    "fortune": {"cash_mult": 0.0, "start_money": 50000, "goal": 50},
+}
+MOD_NAMES = {mid: name for mods in MODIFIERS.values() for mid, name, _ in mods}
+
+# Achievements: (id, name, how to get it). Sandbox games don't count.
+ACHIEVEMENTS = [
+    ("first_pop", "First Pop", "Pop your first balloon"),
+    ("round10", "Warming Up", "Reach round 10"),
+    ("win_easy", "Easy Win", "Beat round 30 on Easy"),
+    ("win_normal", "Normal Win", "Beat round 30 on Normal"),
+    ("win_hard", "Hard Win", "Beat round 30 on Hard"),
+    ("flawless", "Flawless", "Beat round 30 without losing a life"),
+    ("world_traveler", "World Traveler", "Win on all 8 maps"),
+    ("champion", "Champion", "Beat round 150"),
+    ("pop_1k", "Pop Star", "Pop 1,000 balloons (all games)"),
+    ("pop_100k", "Pop Legend", "Pop 100,000 balloons (all games)"),
+    ("blimp", "Blimp Buster", "Pop a Blimp"),
+    ("titan", "Titan Slayer", "Pop a Titan"),
+    ("phantom", "Ghost Hunter", "Pop a Phantom"),
+    ("colossus", "Giant Killer", "Pop a Colossus"),
+    ("overlord", "Overthrown", "Pop the Overlord"),
+    ("maxed_out", "Maxed Out", "Buy a tier 5 upgrade"),
+    ("power_up", "Power Up", "Use an ability"),
+    ("legend", "Legendary Hero", "Get a hero to level 20"),
+    ("hero_squad", "Hero Squad", "Use all 5 heroes"),
+    ("admiral", "Admiral", "Have all 3 water towers out at once"),
+    ("rich", "Treasure Chest", "Have $10,000 at once"),
+    ("challenger", "Challenger", "Win a game with any modifier"),
+] + [("mod_" + mid, name + " Beaten", "Win with the %s modifier" % name)
+     for mods in MODIFIERS.values() for mid, name, _ in mods if mid != "none"]
+ACH_BY_ID = {a[0]: a for a in ACHIEVEMENTS}
 
 # Sandbox tools: balloon kinds you can send, and how many at once.
 SANDBOX_FLAGS = [("Normal", ""), ("Camo", "c"), ("Regrow", "r"), ("Fortified", "f"),
@@ -1611,9 +1671,11 @@ BARRELS = {   # (length, width, color) of the part that points at balloons
 # One game (a map being played)
 # =====================================================================
 class Game:
-    def __init__(self, app, map_idx, diff_idx):
+    def __init__(self, app, map_idx, diff_idx, mod="none"):
         self.app = app
         self.map_idx, self.diff_idx = map_idx, diff_idx
+        self.mod = mod                         # modifier challenge (see MODIFIERS)
+        self.rules = MOD_RULES.get(mod, {})
         self.mp = MAPS[map_idx]
         self.diff = DIFFICULTIES[diff_idx]
         self.paths = [Path([(x, y + MAP_Y) for x, y in pts]) for pts in self.mp["paths"]]
@@ -1627,8 +1689,10 @@ class Game:
         self.projs = []
         self.spikes = []            # spike piles: [x, y, pierce left, life, tower]
         self.fx = []                # visual effects
-        self.money = self.diff["money"] + self.mp.get("extra_money", 0)   # two-lane maps pay more
-        self.lives = self.diff["lives"]
+        self.money = self.rules.get("start_money", self.diff["money"] + self.mp.get("extra_money", 0))
+        self.lives = self.rules.get("lives", self.diff["lives"])
+        self.goal = self.rules.get("goal", WIN_ROUND)   # the round you need to beat to win
+        self.lost_life = False
         self.round = 0              # the round being played / last played
         self.active = False         # is a round running?
         self.queue = []
@@ -1661,6 +1725,36 @@ class Game:
     # ---------------------------------------------------------- helpers
     def cost(self, base):
         return round_cost(base, self.diff["cost"])
+
+    def earn(self, amount):
+        """All money you earn goes through here, so cash modifiers apply."""
+        gain = amount * self.rules.get("cash_mult", 1.0)
+        self.money += gain
+        return gain
+
+    def ach(self, aid):
+        if not self.sandbox:
+            self.app.unlock(aid)
+
+    def shop_block(self, tt):
+        """Why this tower can't be bought in this mode (or None)."""
+        r = self.rules
+        if tt.get("hero") and r.get("no_hero"):
+            return "No heroes in this mode"
+        if not tt.get("hero") and r.get("towers") and tt["key"] not in r["towers"]:
+            return "Not allowed in this mode"
+        if r.get("max_towers") and len(self.towers) >= r["max_towers"]:
+            return "Max %d towers in this mode" % r["max_towers"]
+        return None
+
+    def upgrade_block(self, t, p):
+        """Why this upgrade isn't allowed in this mode (or None)."""
+        r = self.rules
+        if r.get("max_tier") and t.levels[p] >= r["max_tier"]:
+            return "Tier %d is the max in this mode" % r["max_tier"]
+        if r.get("max_upgrades") and sum(t.levels) >= r["max_upgrades"]:
+            return "Max %d upgrades per tower here" % r["max_upgrades"]
+        return None
 
     def discount_at(self, x, y, skip=None):
         """Villages with Trade Post make things cheaper inside their circle."""
@@ -1759,13 +1853,15 @@ class Game:
                 t.hero_level = t.xp_level()
                 self.refresh_buffs()
                 self.toast("%s reached level %d!" % (t.t["name"], t.hero_level), 1.8)
+                if t.hero_level >= HERO_MAX_LEVEL:
+                    self.ach("legend")
                 self.add_fx("ring", t.x, t.y, 0.5, (TOWER_R + 14, (255, 215, 80)))
                 self.app.sounds.play("upgrade")
 
     # ---------------------------------------------------------- saving
     def snapshot(self):
         """Everything needed to continue this game later (saved between rounds)."""
-        return dict(map=self.map_idx, diff=self.diff_idx, round=self.round, money=self.money,
+        return dict(map=self.map_idx, diff=self.diff_idx, mod=self.mod, round=self.round, money=self.money,
                     lives=self.lives, won=self.won,
                     towers=[dict(key=t.key, x=t.x, y=t.y, levels=t.levels, target=t.target_mode,
                                  curve=t.curve, spent=t.spent, pops=t.pops, xp=t.xp,
@@ -1817,7 +1913,7 @@ class Game:
                 income += pay
                 lives += t.s.get("lives", 0)
                 self.add_fx("text", t.x, t.y - 20, 1.2, "+$%d" % pay)
-        self.money += bonus + income
+        earned = self.earn(bonus + income)
         for t in self.towers:   # heroes learn from every round, too
             if t.hero:
                 t.xp += 30 + 3 * self.round
@@ -1826,10 +1922,26 @@ class Game:
         if not self.sandbox:   # sandbox games don't count or overwrite your saved game
             self.app.record_best(self.map_idx, self.diff_idx, self.round)
             self.app.save_resume(self.snapshot())
-        self.toast("Round %d done! +$%d" % (self.round, bonus + income))
-        if self.round == WIN_ROUND and not self.won and not self.sandbox:
+        self.toast("Round %d done! +$%d" % (self.round, earned))
+        if self.round >= 10:
+            self.ach("round10")
+        if self.round == WIN_ROUND and not self.sandbox:
+            self.ach({"Easy": "win_easy", "Normal": "win_normal", "Hard": "win_hard"}.get(self.diff["name"], "round10"))
+            if not self.lost_life:
+                self.ach("flawless")
+            won = self.app.save.setdefault("maps_won", [])
+            if self.mp["name"] not in won:
+                won.append(self.mp["name"])
+            if len(won) >= len(MAPS):
+                self.ach("world_traveler")
+        if self.round == FINAL_ROUND:
+            self.ach("champion")
+        if self.round == self.goal and not self.won and not self.sandbox:
             self.won = True
             self.overlay, self.over_idx = "win", 0
+            if self.mod != "none":
+                self.ach("challenger")
+                self.ach("mod_" + self.mod)
         elif self.round == FINAL_ROUND and not self.sandbox:
             self.overlay, self.over_idx = "champion", 0
         if self.auto:
@@ -1849,7 +1961,11 @@ class Game:
             return
         leftover = -b.hp
         b.alive = False
-        self.money += 1
+        self.earn(1)
+        if not self.sandbox:
+            self.app.count_pop()
+            if b.name in ("blimp", "titan", "phantom", "colossus", "overlord"):
+                self.ach(b.name)
         if tower:
             tower.pops += 1
             if tower.hero:
@@ -1969,6 +2085,8 @@ class Game:
     # ---------------------------------------------------------- abilities
     def ability_list(self):
         """Every unlocked ability on the field: [(tower, ability id)]."""
+        if self.rules.get("no_abilities"):
+            return []
         return [(t, a) for t in self.towers for a in t.abilities()]
 
     def use_ability(self, t, aid):
@@ -1977,7 +2095,11 @@ class Game:
             self.toast("%s ready in %ds" % (ABILITIES[aid][0], math.ceil(left)))
             self.app.sounds.play("error")
             return
+        if self.rules.get("no_abilities"):
+            self.toast("No abilities in this mode")
+            return
         t.ab_cool[aid] = ABILITIES[aid][1]
+        self.ach("power_up")
         self.toast(ABILITIES[aid][0] + "!", 1.2)
         self.app.sounds.play("upgrade")
         s = t.s
@@ -2032,7 +2154,7 @@ class Game:
                 b.frozen = max(b.frozen, 1.5 * P)
         elif aid in ("cash_crate", "payday"):
             cash = {"cash_crate": (300, 1200), "payday": (600, 3000)}[aid][min(P, 2) - 1]
-            self.money += cash
+            cash = self.earn(cash)
             self.add_fx("text", t.x, t.y - 20, 1.2, "+$%d" % cash)
         elif aid == "spike_carpet":
             self.make_spikes(t)   # makes sure the reachable spots are known
@@ -2074,7 +2196,7 @@ class Game:
             self.explode(boom)
         elif aid == "crypto_boost":
             cash = 200 + 30 * lvl
-            self.money += cash
+            cash = self.earn(cash)
             self.add_fx("text", t.x, t.y - 20, 1.2, "+$%d" % cash)
         elif aid == "glitch_wave":
             for b in on_screen:
@@ -2375,6 +2497,7 @@ class Game:
             if b.dist >= b.path.total:
                 b.alive = False
                 self.lives -= self.rbe_left(b)
+                self.lost_life = True
                 self.app.sounds.play("leak")
             else:
                 b.x, b.y, b.seg = b.path.pos(b.dist, b.seg)
@@ -2487,6 +2610,8 @@ class Game:
     # ---------------------------------------------------------- input
     def update(self, dt, inp):
         self.toast_t = max(0.0, self.toast_t - dt)
+        if self.money >= 10000 and not self.sandbox:
+            self.ach("rich")
         for f in self.fx:
             f[3] += dt
         self.fx = [f for f in self.fx if f[3] < f[4]]
@@ -2590,6 +2715,9 @@ class Game:
             existing = self.tower_at(self.cx, self.cy)
             if existing:
                 self.open_menu(existing)
+            elif self.shop_block(tt):
+                self.toast(self.shop_block(tt))
+                self.app.sounds.play("error")
             elif tt.get("hero") and any(t.hero for t in self.towers):
                 self.toast("Only one hero at a time")
                 self.app.sounds.play("error")
@@ -2604,6 +2732,14 @@ class Game:
                 self.towers.append(Tower(tt, self.cx, self.cy, cost))
                 self.refresh_buffs()
                 self.app.sounds.play("place")
+                if tt.get("hero") and not self.sandbox:
+                    used = self.app.save.setdefault("heroes_used", [])
+                    if tt["key"] not in used:
+                        used.append(tt["key"])
+                    if len(used) >= len(HERO_TYPES):
+                        self.ach("hero_squad")
+                if all(any(t.key == k for t in self.towers) for k in WATER_KEYS):
+                    self.ach("admiral")
                 self.mode = "normal"
 
     def open_menu(self, t):
@@ -2615,7 +2751,8 @@ class Game:
         """What's in a tower's menu, top to bottom."""
         rows = ["hero"] if t.hero else []
         rows += ["upgrade%d" % p for p in range(len(t.t["paths"]))]
-        rows += ["ability:" + a for a in t.abilities()]
+        if not self.rules.get("no_abilities"):
+            rows += ["ability:" + a for a in t.abilities()]
         rows.append("target")
         if t.key == "boom":
             rows.append("curve")
@@ -2653,7 +2790,10 @@ class Game:
         elif row.startswith("upgrade"):
             p = int(row[7:])
             state = t.upgrade_state(p)
-            if state == "max":
+            if state == "ok" and self.upgrade_block(t, p):
+                self.toast(self.upgrade_block(t, p))
+                self.app.sounds.play("error")
+            elif state == "max":
                 self.toast("That path is maxed out")
             elif state == "locked":
                 self.toast("Only one path can go past level 2")
@@ -2670,6 +2810,8 @@ class Game:
                     t.levels[p] += 1
                     self.refresh_buffs()
                     self.app.sounds.play("upgrade")
+                    if t.levels[p] >= MAX_TIER:
+                        self.ach("maxed_out")
                     self.add_fx("ring", t.x, t.y, 0.3, (TOWER_R + 10, YELLOW))
         elif row == "sell":
             value = int(t.spent * SELL_RATE)
@@ -3094,7 +3236,7 @@ class Game:
             r = img.get_rect(midleft=(236, 21))
             pygame.draw.rect(surf, GREEN, r.inflate(10, 6), border_radius=6)
             surf.blit(img, r)
-        goal = WIN_ROUND if self.round <= WIN_ROUND else FINAL_ROUND
+        goal = self.goal if self.round <= self.goal else FINAL_ROUND
         rtxt = "Round %d/%d" % (max(1, self.round), goal) if self.round <= FINAL_ROUND \
             else "Round %d" % self.round
         img = app.text(app.f_norm, rtxt, WHITE)
@@ -3118,6 +3260,11 @@ class Game:
                 pygame.draw.rect(surf, YELLOW, (x + 2, PANEL_Y + 3, slot_w - 4, 62), 2, border_radius=6)
             spr = app.icons[tt["key"]]
             surf.blit(spr, (x + slot_w // 2 - 22, PANEL_Y + 2))
+            r = self.rules
+            if (tt.get("hero") and r.get("no_hero")) or (not tt.get("hero") and r.get("towers")
+                                                           and tt["key"] not in r["towers"]):
+                pygame.draw.line(surf, (230, 60, 60), (x + slot_w // 2 - 16, PANEL_Y + 8),
+                                 (x + slot_w // 2 + 16, PANEL_Y + 40), 4)   # not allowed in this mode
             img = app.text(app.f_small, "$%d" % cost, GREEN if self.money >= cost else (230, 110, 110))
             surf.blit(img, img.get_rect(center=(x + slot_w // 2, PANEL_Y + 54)))
         for side, show in ((-1, first > 0), (1, first + shown < len(SHOP))):
@@ -3198,7 +3345,9 @@ class Game:
             rows.append(("Level %d   %s" % (t.hero_level, xp), (255, 215, 80), hint))
         for p in range(len(t.t["paths"])):
             state = t.upgrade_state(p)
-            if state == "max":
+            if state == "ok" and self.upgrade_block(t, p):
+                rows.append(("Path %s: mode limit" % "ABC"[p], GRAY, self.upgrade_block(t, p)))
+            elif state == "max":
                 rows.append(("Path %s: MAX" % "ABC"[p], GRAY, "Fully upgraded"))
             elif state == "locked":
                 rows.append(("Path %s: locked" % "ABC"[p], GRAY, "Another path is past level 2"))
@@ -3217,7 +3366,7 @@ class Game:
                     after.levels[p] += 1
                     after.recalc()
                     stats = "> " + stat_changes(before.s, after.s)
-        for aid in t.abilities():
+        for aid in ([] if self.rules.get("no_abilities") else t.abilities()):
             name, _, desc = ABILITIES[aid]
             left = t.ab_cool.get(aid, 0)
             rows.append(("%s: %s" % (name, "READY (A)" if left <= 0 else "%ds" % math.ceil(left)),
@@ -3344,9 +3493,13 @@ class App:
                                 random.uniform(25, 60)] for _ in range(14)]
         self.btn_hold = 0.0
         self.title_idx = 0       # main menu: Continue (if saved) or Play
-        self.play_idx = 2        # play screen: START
+        self.play_idx = 3        # play screen: START
         self.set_idx = 0
         self.tab_idx = 0         # Towers & Heroes screen
+        self.mod_idx = 0         # play screen: modifier
+        self.ach_scroll = 0
+        self.banners = []        # achievement banners waiting to show
+        self.smoke_frames = 0    # --smoke-test: quit after this many frames
         self.guide_back = "title"
         self._previews = {}
 
@@ -3505,7 +3658,7 @@ class App:
     def continue_game(self):
         snap = self.save["resume"]
         self.map_idx, self.diff_idx = snap["map"], snap["diff"]
-        self.game = Game(self, self.map_idx, self.diff_idx)
+        self.game = Game(self, self.map_idx, self.diff_idx, snap.get("mod", "none"))
         self.game.restore(snap)
         self.state = "game"
 
@@ -3567,9 +3720,9 @@ class App:
     # Main menu -> Play (pick map + difficulty) / Settings / How to play
     def title_rows(self):
         rows = ["continue"] if self.save.get("resume") else []
-        return rows + ["play", "towers", "settings", "help", "quit"]
+        return rows + ["play", "towers", "achievements", "settings", "help", "quit"]
 
-    PLAY_ROWS = ["map", "mode", "start", "back"]
+    PLAY_ROWS = ["map", "mode", "mod", "start", "back"]
     SETTINGS_ROWS = ["auto", "sound", "buttons", "back"]
 
     def make_title_bg(self):
@@ -3620,7 +3773,8 @@ class App:
         cy = rect.centery - (8 if sub else 0)
         surf.blit(img, img.get_rect(center=(rect.centerx, cy)))
         if sub:
-            img = self.text(self.f_small, sub, (220, 225, 240))
+            font = self.f_small if self.f_small.size(sub)[0] <= rect.w - 16 else self.f_tiny
+            img = self.text(font, sub, (220, 225, 240))
             surf.blit(img, img.get_rect(center=(rect.centerx, cy + 22)))
 
     def animate_title(self, dt):
@@ -3652,6 +3806,8 @@ class App:
             self.state, self.set_idx = "settings", 0
         elif row == "towers":
             self.open_guide(back="title")
+        elif row == "achievements":
+            self.state, self.ach_scroll = "achievements", 0
         elif row == "help":
             self.state = "help"
         elif row == "quit":
@@ -3661,7 +3817,7 @@ class App:
         self.draw_title_bg(surf)
         self.draw_logo(surf)
         rows = self.title_rows()
-        y = 186 if len(rows) > 5 else 205
+        y = 178 if len(rows) > 6 else 192
         for i, row in enumerate(rows):
             sub = None
             if row == "continue":
@@ -3669,12 +3825,12 @@ class App:
                 label, color = "Continue", (60, 150, 90)
                 sub = "%s  -  round %d" % (MAPS[snap["map"]]["name"], snap["round"] + 1)
             else:
-                label = {"play": "Play", "towers": "Towers & Heroes", "settings": "Settings",
-                         "help": "How to Play", "quit": "Quit"}[row]
+                label = {"play": "Play", "towers": "Towers & Heroes", "achievements": "Achievements",
+                         "settings": "Settings", "help": "How to Play", "quit": "Quit"}[row]
                 color = (215, 120, 40) if row == "play" else (120, 80, 160) if row == "towers" else (70, 90, 150)
-            h = 60 if sub else 50
+            h = (54 if sub else 44) if len(rows) > 6 else (58 if sub else 48)
             self.draw_button(surf, (90, y, 300, h), label, i == self.title_idx, color, sub)
-            y += h + 12
+            y += h + (9 if len(rows) > 6 else 11)
         img = self.text(self.f_small, "D-pad: choose    A: OK", (40, 60, 40))
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 628 - 20)))
         img = self.text(self.f_tiny, VERSION, (40, 60, 90))
@@ -3696,11 +3852,18 @@ class App:
             self.map_idx = (self.map_idx + step) % len(MAPS)
         elif row == "mode" and step:
             self.diff_idx = (self.diff_idx + step) % len(DIFFICULTIES)
+            self.mod_idx = 0
+        elif row == "mod" and step:
+            self.mod_idx = (self.mod_idx + step) % len(self.mods_here())
         if "B" in self.inp.pressed or ("A" in self.inp.pressed and row == "back"):
             self.state = "title"
         elif ("A" in self.inp.pressed and row != "back") or "START" in self.inp.pressed:
-            self.game = Game(self, self.map_idx, self.diff_idx)
+            self.game = Game(self, self.map_idx, self.diff_idx, self.mods_here()[self.mod_idx][0])
             self.state = "game"
+
+    def mods_here(self):
+        """Modifiers you can pick for the chosen difficulty."""
+        return MODIFIERS[DIFFICULTIES[self.diff_idx]["name"]]
 
     def draw_play(self, surf):
         self.draw_title_bg(surf)
@@ -3711,21 +3874,21 @@ class App:
         surf.blit(out, r.move(2, 3))
         surf.blit(img, r)
         # the map card
-        card = pygame.Rect(60, 60, 360, 350)
+        card = pygame.Rect(60, 56, 360, 322)
         pygame.draw.rect(surf, (20, 25, 45), card.move(0, 6), border_radius=16)
         pygame.draw.rect(surf, (40, 48, 75), card, border_radius=16)
         pygame.draw.rect(surf, YELLOW if row == "map" else (90, 100, 140), card, 3, border_radius=16)
-        prev = self.map_preview(self.map_idx, 230)
-        pr = prev.get_rect(center=(SCREEN_W // 2, 190))
+        prev = self.map_preview(self.map_idx, 210)
+        pr = prev.get_rect(center=(SCREEN_W // 2, 176))
         pygame.draw.rect(surf, WHITE, pr.inflate(8, 8), border_radius=6)
         surf.blit(prev, pr)
         for side in (-1, 1):   # arrows to flip through maps
             ax = SCREEN_W // 2 + side * 152
             col = YELLOW if row == "map" else (150, 160, 190)
-            pygame.draw.polygon(surf, col, [(ax + side * 12, 190), (ax - side * 6, 172), (ax - side * 6, 208)])
+            pygame.draw.polygon(surf, col, [(ax + side * 12, 176), (ax - side * 6, 158), (ax - side * 6, 194)])
         mp = MAPS[self.map_idx]
         img = self.text(self.f_med, mp["name"], WHITE)
-        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 334)))
+        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 306)))
         badge_col = {"Easy": (70, 180, 80), "Medium": (220, 170, 40), "Hard": (210, 70, 60)}[mp["level"]]
         badge = self.text(self.f_small, mp["level"], WHITE)
         best = self.best(self.map_idx, self.diff_idx)
@@ -3734,17 +3897,21 @@ class App:
                          (255, 220, 120) if best >= WIN_ROUND else (200, 205, 225))
         total = badge.get_width() + 24 + 14 + info.get_width()
         bx = SCREEN_W // 2 - total // 2
-        br = pygame.Rect(bx, 360, badge.get_width() + 24, 30)
+        br = pygame.Rect(bx, 332, badge.get_width() + 24, 30)
         pygame.draw.rect(surf, badge_col, br, border_radius=15)
         surf.blit(badge, badge.get_rect(center=br.center))
         surf.blit(info, (br.right + 14, br.centery - info.get_height() // 2))
         # difficulty
         diff = DIFFICULTIES[self.diff_idx]
-        self.draw_button(surf, (90, 426, 300, 58), "< %s >" % diff["name"], row == "mode", (70, 90, 150),
+        self.draw_button(surf, (90, 392, 300, 56), "< %s >" % diff["name"], row == "mode", (70, 90, 150),
                          "Endless money and lives" if diff.get("sandbox") else
                          "%d lives  -  $%d to start" % (diff["lives"], diff["money"] + mp.get("extra_money", 0)))
-        self.draw_button(surf, (90, 500, 300, 56), "START!", row == "start", (60, 160, 70))
-        self.draw_button(surf, (170, 572, 140, 42), "Back", row == "back", (90, 90, 110))
+        mid, mname, mdesc = self.mods_here()[self.mod_idx]
+        beaten = ("mod_" + mid) in self.save.get("ach", [])
+        self.draw_button(surf, (90, 460, 300, 56), "< %s >" % mname, row == "mod",
+                         (150, 90, 50) if mid != "none" else (80, 80, 100), mdesc + ("  (beaten!)" if beaten else ""))
+        self.draw_button(surf, (90, 530, 300, 50), "START!", row == "start", (60, 160, 70))
+        self.draw_button(surf, (170, 592, 140, 38), "Back", row == "back", (90, 90, 110))
 
     # ----- towers & heroes: every upgrade, one tab per tower (L/R to switch)
     def wrap(self, text, font, width):
@@ -3849,6 +4016,83 @@ class App:
                         (200, 205, 225))
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, SCREEN_H - 15)))
 
+    # ----- achievements
+    def count_pop(self):
+        """Lifetime pops (saved with the next save) for the Pop Star / Pop Legend achievements."""
+        n = self.save.get("pops_total", 0) + 1
+        self.save["pops_total"] = n
+        if n == 1:
+            self.unlock("first_pop")
+        elif n == 1000:
+            self.unlock("pop_1k")
+        elif n == 100000:
+            self.unlock("pop_100k")
+
+    def unlock(self, aid):
+        got = self.save.setdefault("ach", [])
+        if aid in got or aid not in ACH_BY_ID:
+            return
+        got.append(aid)
+        self.write_save()
+        self.banners.append([ACH_BY_ID[aid][1], 3.0])
+        self.sounds.play("upgrade")
+
+    def draw_banner(self, surf, dt):
+        """'Achievement unlocked' banner sliding over whatever screen is showing."""
+        if not self.banners:
+            return
+        name, left = self.banners[0]
+        self.banners[0][1] -= dt
+        if self.banners[0][1] <= 0:
+            self.banners.pop(0)
+        slide = min(1.0, (3.0 - left) * 4, left * 4)
+        rect = pygame.Rect(40, int(-60 + 104 * slide), SCREEN_W - 80, 52)
+        pygame.draw.rect(surf, (25, 20, 10), rect.move(0, 4), border_radius=14)
+        pygame.draw.rect(surf, (60, 45, 15), rect, border_radius=14)
+        pygame.draw.rect(surf, (255, 205, 60), rect, 3, border_radius=14)
+        self.draw_trophy(surf, rect.x + 30, rect.centery, True)
+        surf.blit(self.text(self.f_tiny, "ACHIEVEMENT UNLOCKED", (255, 215, 90)), (rect.x + 56, rect.y + 7))
+        surf.blit(self.text(self.f_norm, name, WHITE), (rect.x + 56, rect.y + 23))
+
+    def draw_trophy(self, surf, x, y, gold):
+        col = (255, 200, 50) if gold else (90, 95, 110)
+        pygame.draw.rect(surf, col, (x - 9, y - 12, 18, 13), border_radius=4)
+        pygame.draw.arc(surf, col, (x - 15, y - 11, 10, 10), math.pi / 2, 3 * math.pi / 2, 2)
+        pygame.draw.arc(surf, col, (x + 5, y - 11, 10, 10), -math.pi / 2, math.pi / 2, 2)
+        pygame.draw.rect(surf, col, (x - 2, y + 1, 4, 6))
+        pygame.draw.rect(surf, col, (x - 7, y + 7, 14, 4), border_radius=2)
+
+    def update_achievements(self, dt):
+        rows = len(ACHIEVEMENTS)
+        if "DOWN" in self.inp.repeat:
+            self.ach_scroll = min(rows - 8, self.ach_scroll + 1)
+        if "UP" in self.inp.repeat:
+            self.ach_scroll = max(0, self.ach_scroll - 1)
+        if "B" in self.inp.pressed or "A" in self.inp.pressed:
+            self.state = "title"
+
+    def draw_achievements(self, surf):
+        surf.fill((30, 34, 50))
+        got = set(self.save.get("ach", []))
+        n = sum(1 for a in ACHIEVEMENTS if a[0] in got)
+        surf.blit(self.text(self.f_med, "Achievements", YELLOW), (18, 12))
+        txt = self.text(self.f_small, "%d / %d" % (n, len(ACHIEVEMENTS)), WHITE)
+        surf.blit(txt, (SCREEN_W - txt.get_width() - 18, 20))
+        pygame.draw.rect(surf, (20, 22, 32), (18, 54, SCREEN_W - 36, 12), border_radius=6)
+        pygame.draw.rect(surf, (255, 200, 50), (18, 54, int((SCREEN_W - 36) * n / len(ACHIEVEMENTS)), 12), border_radius=6)
+        for i, (aid, name, desc) in enumerate(ACHIEVEMENTS[self.ach_scroll:self.ach_scroll + 8]):
+            y = 78 + i * 64
+            have = aid in got
+            card = pygame.Rect(12, y, SCREEN_W - 24, 58)
+            pygame.draw.rect(surf, (55, 50, 35) if have else (40, 44, 62), card, border_radius=10)
+            pygame.draw.rect(surf, (255, 200, 50) if have else (70, 75, 95), card, 2, border_radius=10)
+            self.draw_trophy(surf, card.x + 28, card.centery, have)
+            surf.blit(self.text(self.f_norm, name, WHITE if have else (170, 175, 190)), (card.x + 56, y + 7))
+            surf.blit(self.text(self.f_small, desc, (210, 200, 160) if have else (130, 135, 155)), (card.x + 56, y + 33))
+        pygame.draw.rect(surf, (22, 25, 38), (0, SCREEN_H - 30, SCREEN_W, 30))
+        img = self.text(self.f_small, "UP / DOWN: scroll     B: back", (200, 205, 225))
+        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, SCREEN_H - 15)))
+
     # ----- settings
     def update_settings(self, dt):
         self.animate_title(dt)
@@ -3915,6 +4159,10 @@ class App:
         surf.fill(DARK)
         for i, (line, col) in enumerate(self.HELP):
             surf.blit(self.text(self.f_small, line, col), (20, 14 + i * 28))
+        for j, line in enumerate(("Keyboard: arrows  Z = A  X = B  A / S = L / R",
+                                  "Enter = START  Tab = SELECT  D = powers  F11 = fullscreen")):
+            img = self.text(self.f_tiny, line, (150, 200, 255))
+            surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 584 + j * 16)))
         img = self.text(self.f_small, "Press A or B to go back", GRAY)
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, SCREEN_H - 20)))
 
@@ -3979,6 +4227,8 @@ class App:
                     self.inp.remove_joystick(e.instance_id)
                 elif self.on_event(e):
                     pass
+                elif e.type == pygame.KEYDOWN and e.key == pygame.K_F11 and not self.rotate:
+                    pygame.display.toggle_fullscreen()
                 elif e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                     if self.state == "game" and self.game and not self.game.overlay:
                         self.game.overlay, self.game.over_idx = "pause", 0
@@ -3999,6 +4249,10 @@ class App:
                 self.update_settings(dt)
                 if self.state == "settings":
                     self.draw_settings(self.canvas)
+            elif self.state == "achievements":
+                self.update_achievements(dt)
+                if self.state == "achievements":
+                    self.draw_achievements(self.canvas)
             elif self.state == "towers":
                 self.update_towers(dt)
                 if self.state == "towers":
@@ -4014,7 +4268,12 @@ class App:
                 self.game.update(dt, self.inp)
                 if self.game:   # may have quit to the title
                     self.game.draw(self.canvas)
+            self.draw_banner(self.canvas, dt)
             self.present()
+            if self.smoke_frames:
+                self.smoke_frames -= 1
+                if self.smoke_frames == 0:
+                    self.running = False
             pygame.display.flip()
 
     def on_event(self, e):
@@ -4026,6 +4285,17 @@ class App:
             self.screen.blit(pygame.transform.rotate(self.canvas, self.rotate), (0, 0))
 
 
+def make_window_icon():
+    """A shiny red balloon for the window / taskbar icon."""
+    icon = pygame.Surface((64, 64), pygame.SRCALPHA)
+    pygame.draw.line(icon, (90, 90, 90), (32, 52), (28, 63), 2)
+    pygame.draw.polygon(icon, (150, 25, 25), [(26, 54), (38, 54), (32, 46)])
+    pygame.draw.ellipse(icon, (225, 45, 45), (10, 4, 44, 48))
+    shade_ball(icon, 32, 28, 22, 24)
+    pygame.draw.ellipse(icon, (120, 20, 20), (10, 4, 44, 48), 2)
+    return icon
+
+
 def main():
     global FPS
     ap = argparse.ArgumentParser(description="Balloon Blitz tower defense")
@@ -4035,6 +4305,7 @@ def main():
     ap.add_argument("--buttons", action="store_true", help="start on the button test screen")
     ap.add_argument("--fps", type=int, default=FPS, help="frames per second (30 saves battery)")
     ap.add_argument("--mute", action="store_true", help="no sound")
+    ap.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)   # build check: run briefly, quit
     args = ap.parse_args()
     FPS = args.fps
 
@@ -4044,7 +4315,8 @@ def main():
     if args.mute:
         pygame.mixer.quit()
     pygame.display.set_caption("Balloon Blitz")
-    flags = pygame.SCALED | (pygame.FULLSCREEN if args.fullscreen else 0)
+    pygame.display.set_icon(make_window_icon())
+    flags = pygame.SCALED | (pygame.FULLSCREEN if args.fullscreen else pygame.RESIZABLE)
     sideways = args.rotate in (90, 270)
     size = (SCREEN_H, SCREEN_W) if sideways else (SCREEN_W, SCREEN_H)
     screen = pygame.display.set_mode(size, flags)
@@ -4054,6 +4326,8 @@ def main():
     app = App(screen, canvas, args.rotate)
     if args.buttons:
         app.state = "buttons"
+    if args.smoke_test:   # used by the automatic builds to check the game starts
+        app.smoke_frames = 120
     app.run()
     pygame.quit()
 
