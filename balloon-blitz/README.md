@@ -22,6 +22,7 @@ emulator in [`../pc-tester`](../pc-tester).
   everything inside them escapes too).
 - **L / R** picks a tower or hero to build, **A** builds it at the cursor.
 - **A** on a tower opens its menu: upgrades, abilities, targeting, selling.
+  Next to the tower's name you'll see its **match stats**: total damage dealt and balloons popped.
 - **START** sends the next round (and pauses during a round).
 - **SELECT** changes the speed: **1x → 2x → 3x**.
 - **L + R together** (or **D** on a keyboard) opens the **ability bar**.

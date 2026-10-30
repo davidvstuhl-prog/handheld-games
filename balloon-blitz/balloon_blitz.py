@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v3.2 (16 towers, 5 heroes, 8 maps)"
+VERSION = "v3.3 (16 towers, 5 heroes, 8 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -855,6 +855,7 @@ class Tower:
         self.angle = -math.pi / 2
         self.target_mode = 2 if self.key == "sniper" else 0
         self.pops = 0
+        self.dmg_done = 0         # total damage dealt this match (shown in the tower menu)
         self.flash = 0.0
         self.cool2 = 0.0          # Dragon's Breath flamethrower
         self.curve = 1            # Boomerang: 1 = curves right, -1 = curves left
@@ -1517,7 +1518,8 @@ class Game:
         return dict(map=self.map_idx, diff=self.diff_idx, round=self.round, money=self.money,
                     lives=self.lives, won=self.won,
                     towers=[dict(key=t.key, x=t.x, y=t.y, levels=t.levels, target=t.target_mode,
-                                 curve=t.curve, spent=t.spent, pops=t.pops, xp=t.xp) for t in self.towers])
+                                 curve=t.curve, spent=t.spent, pops=t.pops, xp=t.xp,
+                                 dmg=t.dmg_done) for t in self.towers])
 
     def restore(self, snap):
         self.round, self.money, self.lives, self.won = snap["round"], snap["money"], snap["lives"], snap["won"]
@@ -1528,6 +1530,7 @@ class Game:
             t = Tower(types[d["key"]], d["x"], d["y"], d["spent"])
             t.levels = list(d["levels"])
             t.target_mode, t.curve, t.pops, t.xp = d["target"], d["curve"], d["pops"], d["xp"]
+            t.dmg_done = d.get("dmg", 0)
             if t.hero:
                 t.hero_level = t.xp_level()
             self.towers.append(t)
@@ -1585,6 +1588,8 @@ class Game:
         if dtype in b.info["immune"]:
             self.add_fx("clink", b.x, b.y, 0.15)
             return
+        if tower:   # count the damage that actually landed (not overkill)
+            tower.dmg_done += min(dmg, max(0, b.hp))
         b.hp -= dmg
         if b.hp > 0:
             return
@@ -2604,14 +2609,17 @@ class Game:
         self.draw_ability_bar(surf)
         if self.mode == "menu" and self.sel:
             self.draw_menu(surf)
+        # messages go at the top of the map, or at the bottom if a tower menu is up there
+        menu_at_top = self.mode == "menu" and self.sel and self.sel.y >= MAP_Y + MAP_H / 2
+        msg_y = PANEL_Y - 90 if menu_at_top else MAP_Y + 30
         if self.auto_wait > 0 and not self.active:
             t = app.text(app.f_norm, "Next round in %d..." % math.ceil(self.auto_wait), YELLOW)
-            r = t.get_rect(center=(SCREEN_W // 2, MAP_Y + 72))
+            r = t.get_rect(center=(SCREEN_W // 2, msg_y + 42))
             pygame.draw.rect(surf, DARK, r.inflate(20, 10), border_radius=8)
             surf.blit(t, r)
         if self.toast_t > 0:
             t = app.text(app.f_norm, self.toast_text, WHITE)
-            r = t.get_rect(center=(SCREEN_W // 2, MAP_Y + 30))
+            r = t.get_rect(center=(SCREEN_W // 2, msg_y))
             pygame.draw.rect(surf, DARK, r.inflate(20, 10), border_radius=8)
             surf.blit(t, r)
         if self.overlay:
@@ -2826,8 +2834,27 @@ class Game:
         box = pygame.Rect(6, y0, SCREEN_W - 12, h)
         pygame.draw.rect(surf, (28, 32, 46), box, border_radius=10)
         pygame.draw.rect(surf, (110, 120, 150), box, 2, border_radius=10)
-        title = "%s  (popped %d)" % (t.t["name"], t.pops)
-        surf.blit(app.text(app.f_norm, title, YELLOW), (18, y0 + 8))
+        name = app.text(app.f_norm, t.t["name"], YELLOW)
+        surf.blit(name, (18, y0 + 8))
+        # match stats right next to the name: damage dealt and layers popped
+        x = 18 + name.get_width() + 12
+        for label, col, icon in (("%s dmg" % "{:,}".format(int(t.dmg_done)), (230, 110, 60), "sword"),
+                                 ("%s pops" % "{:,}".format(t.pops), (70, 140, 220), "balloon")):
+            img = app.text(app.f_tiny, label, WHITE)
+            pill = pygame.Rect(x, y0 + 9, img.get_width() + 30, 22)
+            if pill.right > SCREEN_W - 14:
+                break
+            pygame.draw.rect(surf, col, pill, border_radius=11)
+            pygame.draw.rect(surf, darker(col), pill, 2, border_radius=11)
+            ix, iy = pill.x + 11, pill.centery
+            if icon == "sword":
+                pygame.draw.line(surf, WHITE, (ix - 4, iy + 5), (ix + 4, iy - 5), 2)
+                pygame.draw.line(surf, WHITE, (ix - 5, iy + 1), (ix - 1, iy + 5), 2)
+            else:
+                pygame.draw.circle(surf, WHITE, (ix, iy - 1), 5)
+                pygame.draw.line(surf, WHITE, (ix, iy + 4), (ix - 1, iy + 7), 1)
+            surf.blit(img, (pill.x + 20, pill.centery - img.get_height() // 2))
+            x = pill.right + 6
 
         rows = []
         stats = stat_summary(t.s)   # line under the description
