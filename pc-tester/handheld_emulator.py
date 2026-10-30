@@ -7,7 +7,7 @@ before the real parts arrive. Click the buttons with the mouse, or use
 the keyboard:
 
     Arrow keys = D-pad     Z = A     X = B     A = L     S = R
-    Enter = START          Tab = SELECT
+    Enter = START          Tab = SELECT       D = ABILITY (or press L and R together)
 
 Run it with:   python3 handheld_emulator.py
 
@@ -45,6 +45,7 @@ BUTTONS = {
     "R":      ("rect", pygame.Rect(WIN_W - 210, 40, 180, 50), "R", "S key"),
     "SELECT": ("rect", pygame.Rect(RIGHT_X - 95, 560, 90, 34), "SELECT", "Tab"),
     "START":  ("rect", pygame.Rect(RIGHT_X + 5, 560, 90, 34), "START", "Enter"),
+    "ABILITY": ("rect", pygame.Rect(RIGHT_X - 55, 625, 110, 34), "POWERS", "D key"),
 }
 
 
@@ -104,7 +105,7 @@ class EmulatorApp(bb.App):
         hint = self.f_hint.render("Arrow keys", True, LABEL)
         s.blit(hint, hint.get_rect(center=(LEFT_X, 480)))
 
-        for act in ("A", "B", "L", "R", "SELECT", "START"):
+        for act in ("A", "B", "L", "R", "SELECT", "START", "ABILITY"):
             shape, geom, label, key = BUTTONS[act]
             col = BTN_DOWN if act in held else BTN
             if shape == "circle":

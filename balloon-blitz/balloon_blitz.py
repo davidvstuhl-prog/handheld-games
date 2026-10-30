@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v2.3 (13 towers, 7 maps)"
+VERSION = "v3.0 (16 towers, 5 heroes, 8 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -41,7 +41,7 @@ SAVE_FILE = os.path.expanduser("~/.balloon_blitz.json")
 # which number each button sends). The D-pad also works as a hat or as the
 # first two axes, whichever your gamepad uses.
 PAD_BUTTONS = {
-    "A": 0, "B": 1, "SELECT": 2, "START": 3, "L": 4, "R": 5,
+    "A": 0, "B": 1, "SELECT": 2, "START": 3, "L": 4, "R": 5, "ABILITY": 10,
     "UP": 6, "DOWN": 7, "LEFT": 8, "RIGHT": 9,
 }
 AXIS_DEADZONE = 0.5
@@ -53,6 +53,7 @@ KEYMAP = {
     "A": [pygame.K_z, pygame.K_SPACE], "B": [pygame.K_x, pygame.K_BACKSPACE],
     "L": [pygame.K_a, pygame.K_q], "R": [pygame.K_s, pygame.K_e],
     "START": [pygame.K_RETURN], "SELECT": [pygame.K_TAB, pygame.K_RSHIFT],
+    "ABILITY": [pygame.K_d],
 }
 REPEAT_DELAY, REPEAT_RATE = 0.35, 0.09   # menu auto-repeat when holding
 SHOP_SLOTS = 7                  # towers shown at once in the shop bar
@@ -81,6 +82,7 @@ PANEL_HI = (70, 90, 140)
 #   sharp   - darts, tacks, sniper (blocked by lead)
 #   explode - bombs (blocked by black and zebra)
 #   cold    - freezing (blocked by white and zebra)
+#   magic   - wizard magic, fire and plasma (blocked by purple)
 #   normal  - pops anything
 BALLOON_TYPES = {
     "red":     dict(color=(225, 45, 45),   r=12, speed=1.0, hp=1, children=[]),
@@ -92,6 +94,8 @@ BALLOON_TYPES = {
                     immune={"explode"}),
     "white":   dict(color=(245, 245, 245), r=10, speed=2.0, hp=1, children=["pink", "pink"],
                     immune={"cold"}),
+    "purple":  dict(color=(150, 60, 210),  r=13, speed=3.0, hp=1, children=["pink", "pink"],
+                    immune={"magic"}),
     "zebra":   dict(color=(245, 245, 245), r=13, speed=1.8, hp=1, children=["black", "white"],
                     immune={"explode", "cold"}),
     "lead":    dict(color=(135, 140, 150), r=13, speed=1.0, hp=1, children=["black", "black"],
@@ -106,6 +110,11 @@ BALLOON_TYPES = {
 BALLOON_ORDER = list(BALLOON_TYPES)   # used for "Strong" targeting
 for _info in BALLOON_TYPES.values():
     _info.setdefault("immune", set())
+
+# Regrow balloons grow back one layer at a time along this chain.
+REGROW_UP = {"red": "blue", "blue": "green", "green": "yellow", "yellow": "pink"}
+REGROW_TIME = 3.0
+FORTIFIABLE = ("lead", "ceramic", "blimp", "titan")   # armored versions take 2x hits
 
 # "Red balloon equivalent": how many lives a balloon costs if it gets
 # through, counting everything inside it.
@@ -152,7 +161,7 @@ TOWER_TYPES = [
              [("Long Reach", 100, "+15 range", {"range": ("+", 15)}),
               ("More Tacks", 250, "+4 tacks per shot", {"count": ("+", 4)}),
               ("Ring of Fire", 1100, "Fire: 2 damage, pops lead",
-               {"dtype": ("=", "normal"), "dmg": ("+", 1)})],
+               {"dtype": ("=", "magic"), "dmg": ("+", 1)})],
          ]),
     dict(key="boom", name="Boomerang", cost=325,
          desc="Curved throw that comes back",
@@ -241,7 +250,7 @@ TOWER_TYPES = [
     dict(key="wizard", name="Wizard", cost=320,
          desc="Magic pops every balloon type",
          base=dict(range=120, rate=1.1, dmg=1, pierce=3, speed=330,
-                   dtype="normal", homing=False, chain=0, breath=False),
+                   dtype="magic", homing=False, chain=0, breath=False),
          paths=[
              [("Arcane Blast", 240, "Magic does 1 more damage", {"dmg": ("+", 1)}),
               ("Arcane Mastery", 560, "Casts faster, pops 2 more",
@@ -284,7 +293,7 @@ TOWER_TYPES = [
              [("Laser Vision", 1500, "+1 pierce, 15% faster",
                {"pierce": ("+", 1), "rate": ("*", 0.85)}),
               ("Plasma Core", 3500, "+1 damage, pops lead",
-               {"dmg": ("+", 1), "dtype": ("=", "normal")}),
+               {"dmg": ("+", 1), "dtype": ("=", "magic")}),
               ("Solar Flare", 11000, "3 beams, +2 damage, +3 pierce",
                {"count": ("=", 3), "spread": ("=", 0.15), "dmg": ("+", 2), "pierce": ("+", 3)})],
              [("Night Goggles", 600, "Sees camo balloons", {"camo": ("=", True)}),
@@ -304,6 +313,231 @@ TOWER_TYPES = [
               ("Gold Rush", 1500, "This mine pays 50% more", {"mult": ("=", 1.5)})],
          ]),
 ]
+# Water towers: can only be built on water.
+TOWER_TYPES += [
+    dict(key="pirate", name="Pirate Ship", cost=450, water=True,
+         desc="Cannonballs, 2 at a time (water)",
+         base=dict(range=125, rate=1.0, dmg=1, pierce=4, speed=420, dtype="sharp",
+                   count=2, spread=0.14),
+         paths=[
+             [("Grapeshot", 220, "Cannonballs pop 2 more", {"pierce": ("+", 2)}),
+              ("Double Deck", 450, "4 cannonballs per shot", {"count": ("=", 4), "spread": ("=", 0.12)}),
+              ("Iron Balls", 1300, "+2 damage, pops lead", {"dmg": ("+", 2), "dtype": ("=", "normal")})],
+             [("Crow's Nest", 200, "+25 range, sees camo", {"range": ("+", 25), "camo": ("=", True)}),
+              ("Cargo Hold", 500, "+$60 every round", {"income": ("=", 60)}),
+              ("Treasure Fleet", 1500, "+$260 every round", {"income": ("=", 260)})],
+         ]),
+    dict(key="sub", name="Submarine", cost=350, water=True,
+         desc="Fires torpedoes (water)",
+         base=dict(range=135, rate=0.9, dmg=1, pierce=2, speed=460, dtype="sharp",
+                   count=1, spread=0.0, homing=False),
+         paths=[
+             [("Heavy Torpedo", 250, "+1 damage, pops lead", {"dmg": ("+", 1), "dtype": ("=", "normal")}),
+              ("Homing Torpedo", 450, "Torpedoes chase balloons", {"homing": ("=", True)}),
+              ("Torpedo Spread", 1400, "3 torpedoes, +2 pierce",
+               {"count": ("=", 3), "spread": ("=", 0.2), "pierce": ("+", 2)})],
+             [("Sonar", 250, "Sees camo balloons", {"camo": ("=", True)}),
+              ("Periscope", 300, "+30 range", {"range": ("+", 30)}),
+              ("Blimp Hunter", 1500, "4x damage to blimps", {"blimp_mult": ("=", 4)})],
+         ]),
+    dict(key="shark", name="Shark", cost=400, water=True,
+         desc="Bites nearby balloons hard (water)",
+         base=dict(range=90, rate=0.9, dmg=2, pierce=3, dtype="sharp", camo=False, knock=0),
+         paths=[
+             [("Sharp Teeth", 250, "+1 damage", {"dmg": ("+", 1)}),
+              ("Mega Bite", 500, "Bites 3 more balloons", {"pierce": ("+", 3)}),
+              ("Great Bite", 1500, "+3 damage, 3x vs blimps", {"dmg": ("+", 3), "blimp_mult": ("=", 3)})],
+             [("Wide Circle", 200, "+20 range", {"range": ("+", 20)}),
+              ("Smell Blood", 350, "Sees camo balloons", {"camo": ("=", True)}),
+              ("Riptide", 1100, "Bites drag balloons back", {"knock": ("=", 30)})],
+         ]),
+]
+WATER_KEYS = ("pirate", "sub", "shark")
+
+# The middle upgrade path of every tower. Its level 3 unlocks an ability
+# you fire yourself (L+R together, D on a keyboard, or the tower's menu).
+MIDDLE_PATHS = {
+    "dart": [("Quick Draw", 150, "Throws 15% faster", {"rate": ("*", 0.85)}),
+             ("Keen Eye", 250, "+20 range, pops 1 more", {"range": ("+", 20), "pierce": ("+", 1)}),
+             ("Dart Storm", 900, "Ability: 4x faster for 6s", {"ability": ("=", "dart_storm")})],
+    "tack": [("Hot Coils", 180, "Shoots 15% faster", {"rate": ("*", 0.85)}),
+             ("Sharper Tacks", 300, "Tacks pop 1 more", {"pierce": ("+", 1)}),
+             ("Tack Nova", 1000, "Ability: 48-tack blast", {"ability": ("=", "tack_nova")})],
+    "boom": [("Light Rangs", 180, "Throws 15% faster", {"rate": ("*", 0.85)}),
+             ("Spin Edge", 350, "Boomerangs pop 3 more", {"pierce": ("+", 3)}),
+             ("Rang Barrage", 1100, "Ability: 12 boomerangs", {"ability": ("=", "rang_barrage")})],
+    "bomb": [("Short Fuse", 220, "Shoots 15% faster", {"rate": ("*", 0.85)}),
+             ("Shrapnel", 380, "Bigger blasts", {"blast": ("+", 15)}),
+             ("Carpet Bomb", 1300, "Ability: bomb the front line", {"ability": ("=", "carpet_bomb")})],
+    "glue": [("Thick Glue", 150, "Glue lasts longer", {"glue_time": ("+", 4)}),
+             ("Wide Nozzle", 280, "+20 range", {"range": ("+", 20)}),
+             ("Glue Rain", 900, "Ability: glue everything", {"ability": ("=", "glue_rain")})],
+    "frost": [("Cold Core", 160, "Pulses 15% faster", {"rate": ("*", 0.85)}),
+              ("Big Chill", 320, "+15 range", {"range": ("+", 15)}),
+              ("Blizzard", 1100, "Ability: freeze everything", {"ability": ("=", "blizzard")})],
+    "ninja": [("Swift Feet", 250, "Throws 15% faster", {"rate": ("*", 0.85)}),
+              ("Sharp Edges", 400, "Stars pop 2 more", {"pierce": ("+", 2)}),
+              ("Smoke Bomb", 1200, "Ability: knock all back", {"ability": ("=", "smoke_bomb")})],
+    "sniper": [("Steady Aim", 300, "Shoots 15% faster", {"rate": ("*", 0.85)}),
+               ("Hollow Point", 450, "+1 damage", {"dmg": ("+", 1)}),
+               ("Cash Crate", 1400, "Ability: drops $300", {"ability": ("=", "cash_crate")})],
+    "wizard": [("Focus Crystal", 240, "+15 range", {"range": ("+", 15)}),
+               ("Mana Surge", 450, "Casts 20% faster", {"rate": ("*", 0.8)}),
+               ("Meteor", 1400, "Ability: huge blast", {"ability": ("=", "meteor")})],
+    "spike": [("Sturdy Spikes", 250, "Spikes last 50% longer", {"life": ("*", 1.5)}),
+              ("Quick Press", 450, "Makes spikes 20% faster", {"rate": ("*", 0.8)}),
+              ("Spike Carpet", 1300, "Ability: spike the track", {"ability": ("=", "spike_carpet")})],
+    "village": [("Big Square", 300, "Bigger circle", {"range": ("+", 25)}),
+                ("Training Yard", 600, "+10% more range boost", {"boost": ("+", 0.1)}),
+                ("Rally Cry", 2000, "Ability: all towers 2x speed", {"ability": ("=", "rally_cry")})],
+    "super": [("Hyper Core", 1800, "Shoots 15% faster", {"rate": ("*", 0.85)}),
+              ("Laser Lens", 3000, "+2 pierce", {"pierce": ("+", 2)}),
+              ("Overdrive", 8000, "Ability: 3x speed for 8s", {"ability": ("=", "overdrive")})],
+    "pirate": [("Quick Crew", 200, "Fires 15% faster", {"rate": ("*", 0.85)}),
+               ("Big Guns", 400, "Faster balls, pop 1 more", {"speed": ("+", 120), "pierce": ("+", 1)}),
+               ("Broadside", 1200, "Ability: cannons all around", {"ability": ("=", "broadside")})],
+    "sub": [("Quick Tubes", 200, "Fires 15% faster", {"rate": ("*", 0.85)}),
+            ("Twin Tubes", 450, "2 torpedoes per shot", {"count": ("=", 2), "spread": ("=", 0.15)}),
+            ("Depth Charge", 1300, "Ability: blasts the front", {"ability": ("=", "depth_charge")})],
+    "shark": [("Fast Fins", 250, "Bites 15% faster", {"rate": ("*", 0.85)}),
+              ("Hungry", 450, "Bites pop lead", {"dtype": ("=", "normal")}),
+              ("Feeding Frenzy", 1300, "Ability: 3x bites for 8s", {"ability": ("=", "feeding_frenzy")})],
+    "mine": [("Bigger Carts", 350, "+30 money per round", {"income": ("+", 30)}),
+             ("Coin Polish", 600, "+60 money per round", {"income": ("+", 60)}),
+             ("Payday", 1800, "Ability: instant $600", {"ability": ("=", "payday")})],
+}
+for _tt in TOWER_TYPES:
+    _tt["paths"].insert(1, MIDDLE_PATHS[_tt["key"]])
+PATH_COLORS = [(255, 120, 80), (110, 220, 110), (90, 170, 255)]   # pips: top, middle, bottom
+
+# ---------------------------------------------------------------------
+# Heroes: one per game, bought from the shop. They level up (1-20) by
+# themselves as they pop balloons and as rounds go by.
+# ---------------------------------------------------------------------
+HERO_TYPES = [
+    dict(key="knight", name="Spark Knight", cost=550, desc="Lightning sword hits groups",
+         hero=True, paths=[], abilities=[(5, "thunder_strike"), (14, "storm_blade")]),
+    dict(key="witch", name="Wind Witch", cost=500, desc="Gusts pop and push back",
+         hero=True, paths=[], abilities=[(5, "twister"), (14, "hurricane")]),
+    dict(key="gear", name="Gear Gunner", cost=500, desc="Rapid-fire bolt gun",
+         hero=True, paths=[], abilities=[(5, "overclock"), (14, "mega_mortar")]),
+    dict(key="cipher", name="Cipher", cost=600, desc="Hacker: cash, strips camo",
+         hero=True, paths=[], abilities=[(4, "crypto_boost"), (12, "glitch_wave")]),
+    dict(key="nova", name="Nova", cost=650, desc="Mind power lifts balloons",
+         hero=True, paths=[], abilities=[(5, "mind_blast"), (13, "gravity_well")]),
+]
+HERO_KEYS = [h["key"] for h in HERO_TYPES]
+SHOP = TOWER_TYPES + HERO_TYPES
+HERO_MAX_LEVEL = 20
+# total XP needed to reach each level (index 0 = level 1)
+HERO_XP = [0, 40, 100, 180, 280, 400, 540, 700, 880, 1080,
+           1300, 1550, 1830, 2140, 2480, 2850, 3250, 3680, 4140, 4630]
+
+
+def hero_stats(key, lvl):
+    """A hero's stats at a level (1-20)."""
+    f = (lvl - 1) / (HERO_MAX_LEVEL - 1)
+    if key == "knight":
+        return dict(range=85 + 25 * f, rate=0.95 - 0.4 * f, dmg=1 + (lvl >= 6) + (lvl >= 12) + (lvl >= 18),
+                    pierce=5 + lvl // 2, dtype="normal" if lvl >= 8 else "sharp", camo=lvl >= 10)
+    if key == "witch":
+        return dict(range=130 + 30 * f, rate=0.85 - 0.35 * f, dmg=1 + (lvl >= 9) + (lvl >= 17),
+                    pierce=6 + lvl // 2, knock=14 + lvl, speed=380, dtype="normal", camo=lvl >= 3,
+                    count=1 + (lvl >= 11) + (lvl >= 19), spread=0.2)
+    if key == "gear":
+        return dict(range=140 + 30 * f, rate=0.36 - 0.18 * f, dmg=1 + (lvl >= 7) + (lvl >= 15),
+                    pierce=1 + lvl // 6, speed=640, dtype="normal" if lvl >= 9 else "sharp",
+                    camo=lvl >= 4, count=1 + (lvl >= 12), spread=0.12)
+    if key == "cipher":
+        return dict(range=120 + 20 * f, rate=0.9 - 0.4 * f, dmg=1 + (lvl >= 10), pierce=2 + lvl // 5,
+                    speed=500, dtype="normal", camo=lvl >= 2, count=1, spread=0.0,
+                    income=40 + 15 * lvl, lives=3 if lvl >= 16 else 0, decamo=lvl >= 7)
+    # nova
+    return dict(range=120 + 30 * f, rate=1.3 - 0.6 * f, lift_n=min(6, 1 + lvl // 4),
+                lift_time=1.5 + 0.1 * lvl, dmg=1 + (lvl >= 10) + (lvl >= 18),
+                camo=lvl >= 6, lift_heavy=lvl >= 12)
+
+
+# name, cooldown (seconds), what it does
+ABILITIES = {
+    "dart_storm":   ("Dart Storm", 40, "Darts fly 4x faster for 6s"),
+    "tack_nova":    ("Tack Nova", 35, "Blasts 48 tacks all around"),
+    "rang_barrage": ("Rang Barrage", 40, "Throws 12 boomerangs"),
+    "carpet_bomb":  ("Carpet Bomb", 50, "Bombs the front of the line"),
+    "glue_rain":    ("Glue Rain", 45, "Glues every balloon"),
+    "blizzard":     ("Blizzard", 50, "Freezes every balloon 3s"),
+    "smoke_bomb":   ("Smoke Bomb", 45, "Knocks all balloons back"),
+    "cash_crate":   ("Cash Crate", 50, "Drops $300"),
+    "meteor":       ("Meteor", 45, "Huge blast on the strongest"),
+    "spike_carpet": ("Spike Carpet", 40, "Covers the track in spikes"),
+    "rally_cry":    ("Rally Cry", 60, "All towers 2x faster for 8s"),
+    "overdrive":    ("Overdrive", 50, "3x speed for 8s"),
+    "payday":       ("Payday", 60, "Instant $600"),
+    "broadside":    ("Broadside", 40, "16 cannonballs all around"),
+    "depth_charge": ("Depth Charge", 50, "Blasts the front of the line"),
+    "feeding_frenzy": ("Feeding Frenzy", 50, "Bites 3x faster for 8s"),
+    # hero abilities
+    "thunder_strike": ("Thunder Strike", 40, "Lightning jumps to 15 balloons"),
+    "storm_blade":    ("Storm Blade", 60, "Slashes 3x faster for 10s"),
+    "twister":        ("Twister", 40, "Blows nearby balloons far back"),
+    "hurricane":      ("Hurricane", 60, "Slows everything, 2 damage"),
+    "overclock":      ("Overclock", 40, "Fires 3x faster for 8s"),
+    "mega_mortar":    ("Mega Mortar", 55, "Giant blast on the strongest"),
+    "crypto_boost":   ("Crypto Boost", 50, "Instant cash"),
+    "glitch_wave":    ("Glitch Wave", 55, "Strips a layer + camo off all"),
+    "mind_blast":     ("Mind Blast", 40, "Shockwave: 3 damage + stun"),
+    "gravity_well":   ("Gravity Well", 60, "Lifts 30 balloons into the air"),
+}
+
+STAT_LABELS = [("dmg", "Damage"), ("pierce", "Pierce"), ("count", "Shots"), ("rate", "Speed"),
+               ("range", "Range"), ("blast", "Blast"), ("freeze", "Freeze"), ("chain", "Zaps"),
+               ("knock", "Push"), ("glue_time", "Glue"), ("slow", "Slow"), ("life", "Spikes last"),
+               ("income", "Income"), ("lives", "Lives"), ("boost", "Boost"), ("discount", "Discount"),
+               ("blimp_mult", "vs blimps")]
+FLAG_LABELS = {"camo": "sees camo", "homing": "homing", "spikeball": "Spike Ball", "breath": "flamethrower",
+               "freeze_white": "freezes white", "radar": "camo radar", "rune": "lead popping",
+               "glue_blimp": "glues blimps", "mines": "spike mines", "ability": "new ability", "acid": "acid"}
+
+
+def fmt_stat(key, v):
+    if key == "rate":
+        return "%.1f/s" % (1.0 / v)
+    if key in ("slow", "boost", "discount"):
+        return "%d%%" % round(v * 100)
+    if key in ("glue_time", "freeze", "life"):
+        return "%.1fs" % v
+    if key == "income":
+        return "$%d" % v
+    if key == "blimp_mult":
+        return "%gx" % v
+    return "%d" % round(v) if isinstance(v, float) else str(v)
+
+
+def stat_changes(old, new):
+    """Short text like 'Pierce 3>5, Speed 1.2/s>1.5/s' for an upgrade preview."""
+    out = []
+    for key, label in STAT_LABELS:
+        if key in new and old.get(key) != new[key] and isinstance(new[key], (int, float)) \
+                and not isinstance(new[key], bool) and key in old:
+            out.append("%s %s>%s" % (label, fmt_stat(key, old[key]), fmt_stat(key, new[key])))
+    for key, label in FLAG_LABELS.items():
+        if new.get(key) and not old.get(key):
+            out.append("+" + label)
+    if new.get("dtype") != old.get("dtype") and new.get("dtype") in ("normal", "magic"):
+        out.append("+pops lead")
+    return ", ".join(out) or "Small boost"
+
+
+def stat_summary(s):
+    parts = []
+    for key, label in (("dmg", "Dmg"), ("pierce", "Pierce"), ("count", "Shots"), ("rate", "Speed"),
+                       ("range", "Range"), ("income", "Income")):
+        if key in s and not (key == "count" and s[key] <= 1) and not (key == "range" and not 0 < s[key] < 600) \
+                and not (key == "dmg" and not s[key]) and not (key == "income" and not s[key]):
+            parts.append("%s %s" % (label, fmt_stat(key, s[key])))
+    return "  ".join(parts)
+
+
 TARGET_MODES = ["First", "Last", "Strong", "Close"]
 TOWER_SPEED_BOOST = 0.85   # all towers attack 15% faster
 EXTRA_PIERCE_TOWERS = ("dart", "tack", "boom", "ninja", "wizard", "super")   # +1 pierce
@@ -324,6 +558,10 @@ MAPS = [
          paths=[[(-30, 420), (420, 420), (420, 60), (60, 60), (60, 330),
                  (330, 330), (330, 520)]],
          water=[(185, 195, 72), (295, 195, 72), (240, 180, 60)]),
+    dict(name="Harbor", level="Medium", seed=23,
+         paths=[[(-30, 60), (440, 60), (440, 440), (40, 440), (40, 150), (100, 150)]],
+         water=[(250, 260, 105), (175, 300, 55), (330, 300, 55),
+                (385, 260, 38), (115, 290, 40), (250, 380, 35)]),   # coves that reach the track
     dict(name="Crossroads", level="Medium", seed=7,
          paths=[[(-30, 240), (360, 240), (360, 80), (120, 80), (120, 400),
                  (400, 400), (400, 520)]]),
@@ -368,23 +606,23 @@ ROUNDS = [
     [("blue", 80, 0.22, 0)],
     [("green", 20, 0.5, 0), ("yellow", 10, 1.0, 4)],                       # 11
     [("yellow", 20, 0.7, 0), ("green", 15, 0.4, 5)],
-    [("green", 30, 0.35, 0), ("yellow", 15, 0.6, 4), ("pink", 6, 1.0, 10)],
+    [("green", 30, 0.35, 0), ("yellow", 15, 0.6, 4), ("pink", 6, 1.0, 10, "r")],
     [("pink", 15, 0.8, 0), ("yellow", 25, 0.4, 3)],
     [("black", 12, 0.8, 0), ("white", 12, 0.8, 5)],
     [("yellow", 20, 0.5, 0), ("pink", 15, 0.6, 4), ("green", 8, 0.8, 8, True)],
     [("lead", 8, 1.5, 0), ("yellow", 25, 0.4, 2)],
-    [("pink", 30, 0.4, 0), ("black", 10, 0.7, 6)],
+    [("pink", 30, 0.4, 0), ("black", 10, 0.7, 6), ("purple", 5, 0.9, 12)],
     [("zebra", 10, 1.0, 0), ("pink", 20, 0.4, 3)],
     [("zebra", 8, 0.8, 0), ("lead", 10, 1.0, 4), ("pink", 8, 0.8, 6, True)],
-    [("zebra", 15, 0.7, 0), ("rainbow", 5, 1.5, 6)],                       # 21
+    [("zebra", 15, 0.7, 0), ("rainbow", 5, 1.5, 6), ("yellow", 12, 0.5, 10, "r")],   # 21
     [("rainbow", 10, 1.0, 0), ("lead", 8, 0.8, 5)],
-    [("ceramic", 3, 2.5, 0), ("zebra", 15, 0.5, 3), ("black", 8, 0.6, 8, True)],
+    [("ceramic", 3, 2.5, 0), ("zebra", 15, 0.5, 3), ("black", 8, 0.6, 8, True), ("purple", 8, 0.6, 12)],
     [("rainbow", 14, 0.8, 0), ("ceramic", 3, 2.0, 6)],
     [("ceramic", 4, 1.5, 0), ("blimp", 1, 1, 10)],
     [("zebra", 12, 0.6, 0, True), ("ceramic", 6, 1.2, 6)],
-    [("lead", 15, 0.5, 0), ("ceramic", 8, 1.0, 4)],
-    [("ceramic", 12, 0.8, 0), ("blimp", 1, 1, 10)],
-    [("ceramic", 6, 0.9, 0, True), ("ceramic", 6, 0.9, 6), ("blimp", 2, 4, 10)],
+    [("lead", 12, 0.5, 0), ("lead", 4, 1.0, 7, "f"), ("ceramic", 8, 1.0, 4)],
+    [("ceramic", 9, 0.8, 0), ("ceramic", 3, 1.5, 6, "f"), ("blimp", 1, 1, 10)],
+    [("ceramic", 6, 0.9, 0, True), ("ceramic", 6, 0.9, 6), ("purple", 12, 0.4, 3), ("blimp", 2, 4, 10)],
     [("blimp", 2, 3, 0), ("titan", 1, 1, 8)],
 ]
 
@@ -392,8 +630,9 @@ ROUNDS = [
 def freeplay_round(n):
     """Rounds after the last designed one keep getting harder."""
     k = n - len(ROUNDS)
-    groups = [("ceramic", 20 + 3 * k, max(0.15, 0.5 - 0.01 * k), 0, k % 2 == 0),
-              ("blimp", 2 + k // 2, max(0.8, 2.5 - 0.08 * k), 6)]
+    groups = [("ceramic", 20 + 3 * k, max(0.15, 0.5 - 0.01 * k), 0, "c" if k % 2 == 0 else "f"),
+              ("purple", 10 + k, 0.4, 3),
+              ("blimp", 2 + k // 2, max(0.8, 2.5 - 0.08 * k), 6, "f" if k >= 4 else "")]
     if k >= 3:
         groups.append(("titan", k // 3, 6, 15))
     return groups
@@ -406,7 +645,7 @@ def round_cost(base, mult):
 # =====================================================================
 # Input: keyboard + gamepad, turned into 10 simple actions
 # =====================================================================
-ACTIONS = ("UP", "DOWN", "LEFT", "RIGHT", "A", "B", "L", "R", "START", "SELECT")
+ACTIONS = ("UP", "DOWN", "LEFT", "RIGHT", "A", "B", "L", "R", "START", "SELECT", "ABILITY")
 
 
 class Input:
@@ -563,9 +802,10 @@ class Path:
 class Balloon:
     __slots__ = ("name", "info", "hp", "dist", "x", "y", "seg", "alive", "camo",
                  "frozen", "slow", "id", "speed_now", "rank", "r", "path",
-                 "glue", "glue_slow", "acid", "acid_t", "glue_by")
+                 "glue", "glue_slow", "acid", "acid_t", "glue_by", "regrow", "regrow_t", "fort",
+                 "lift", "lift_t", "lift_by")
 
-    def __init__(self, name, dist, camo, bid, hp_mult, path):
+    def __init__(self, name, dist, camo, bid, hp_mult, path, regrow=None, fort=False):
         self.name = name
         self.info = BALLOON_TYPES[name]
         self.hp = self.info["hp"] * (hp_mult if self.info["hp"] > 1 else 1)
@@ -586,6 +826,22 @@ class Balloon:
         self.acid = 0.0          # acid glue: pops a layer every this many seconds
         self.acid_t = 0.0
         self.glue_by = None
+        self.regrow = regrow     # regrow balloons grow back up to this type
+        self.regrow_t = 0.0
+        self.lift = 0.0          # Nova: seconds held up in the air (can't move)
+        self.lift_t = 0.0
+        self.lift_by = None
+        self.fort = fort and name in FORTIFIABLE
+        if self.fort:            # armored: twice the hits (lead needs 4)
+            self.hp = self.hp * 2 if self.hp > 1 else 4
+
+    def set_type(self, name):
+        """Change into another balloon type (used when regrowing)."""
+        self.name = name
+        self.info = BALLOON_TYPES[name]
+        self.hp = self.info["hp"]
+        self.rank = BALLOON_ORDER.index(name)
+        self.r = self.info["r"]
 
 
 class Tower:
@@ -593,7 +849,7 @@ class Tower:
         self.t = ttype
         self.key = ttype["key"]
         self.x, self.y = x, y
-        self.levels = [0, 0]
+        self.levels = [] if ttype.get("hero") else [0, 0, 0]   # heroes level up instead
         self.spent = cost
         self.cool = 0.2
         self.angle = -math.pi / 2
@@ -604,11 +860,24 @@ class Tower:
         self.curve = 1            # Boomerang: 1 = curves right, -1 = curves left
         self.shots = 0            # Ninja: every 4th throw can be a stun bomb
         self.spots = None         # Spike Factory: places on the track it can reach
+        self.frenzy_t = 0.0       # abilities like Dart Storm: attack faster for a while
+        self.frenzy_rate = 1.0
+        self.frenzy_count = 0
+        self.ab_cool = {}         # ability -> seconds until it's ready again
+        self.hero = bool(ttype.get("hero"))
+        self.xp = 0               # heroes only
+        self.hero_level = 1
         self.recalc()
 
     def recalc(self):
+        if self.hero:
+            s = hero_stats(self.key, self.hero_level)
+            if "rate" in s:
+                s["rate"] *= TOWER_SPEED_BOOST
+            self.s = s
+            return
         s = dict(self.t["base"])
-        for p in (0, 1):
+        for p in range(len(self.t["paths"])):
             for i in range(self.levels[p]):
                 for k, (op, v) in self.t["paths"][p][i][3].items():
                     if op == "+":
@@ -620,18 +889,34 @@ class Tower:
         # every tower got a power boost after playtesting
         if "rate" in s:
             s["rate"] *= TOWER_SPEED_BOOST
-        if self.key in EXTRA_PIERCE_TOWERS:
+        if self.key in EXTRA_PIERCE_TOWERS and "pierce" in s:
             s["pierce"] += 1
         self.s = s
 
     def upgrade_state(self, p):
-        """Returns 'ok', 'max' or 'locked' for upgrade path p."""
+        """Returns 'ok', 'max', 'locked' (another path is at 3) or 'two'
+        (two other paths are already upgraded) for upgrade path p."""
         lv = self.levels[p]
         if lv >= 3:
             return "max"
-        if lv + 1 == 3 and self.levels[1 - p] == 3:
+        others = [self.levels[i] for i in range(len(self.levels)) if i != p]
+        if lv == 0 and sum(1 for o in others if o) >= 2:
+            return "two"
+        if lv + 1 == 3 and 3 in others:
             return "locked"
         return "ok"
+
+    def abilities(self):
+        """Abilities this tower has unlocked."""
+        if self.hero:
+            return [aid for lvl, aid in self.t["abilities"] if self.hero_level >= lvl]
+        return [self.s["ability"]] if self.s.get("ability") else []
+
+    def xp_level(self):
+        lvl = 1
+        while lvl < HERO_MAX_LEVEL and self.xp >= HERO_XP[lvl]:
+            lvl += 1
+        return lvl
 
 
 class Proj:
@@ -754,11 +1039,8 @@ def make_blimp_sprites(name):
     return out
 
 
-def make_tower_sprite(key, font):
-    s = pygame.Surface((44, 44), pygame.SRCALPHA)
-    c = 22
-    r = TOWER_R
-    # a round stone base every tower stands on
+def draw_stone_base(s, c, r):
+    """A round stone base land towers stand on."""
     pygame.draw.circle(s, (96, 92, 88), (c, c), r + 3)
     pygame.draw.circle(s, (150, 144, 136), (c, c), r + 2)
     for i in range(8):
@@ -766,6 +1048,36 @@ def make_tower_sprite(key, font):
         pygame.draw.line(s, (110, 105, 100), (c + (r - 1) * math.cos(a), c + (r - 1) * math.sin(a)),
                          (c + (r + 2) * math.cos(a), c + (r + 2) * math.sin(a)), 1)
     shade_ball(s, c, c, r + 3, r + 3, 0.6)
+
+
+def make_tower_sprite(key, font):
+    s = pygame.Surface((44, 44), pygame.SRCALPHA)
+    c = 22
+    r = TOWER_R
+    if key in ("pirate", "sub", "shark"):   # water towers: ripples instead of a stone base
+        pygame.draw.circle(s, (120, 190, 240), (c, c), r + 3, 2)
+        pygame.draw.circle(s, (170, 220, 250), (c, c), r - 1, 1)
+    else:
+        draw_stone_base(s, c, r)
+    if key == "pirate":     # wooden hull, white sail, little flag
+        pygame.draw.ellipse(s, (120, 75, 35), (c - 9, c - 17, 18, 34))
+        pygame.draw.ellipse(s, (70, 40, 15), (c - 9, c - 17, 18, 34), 2)
+        pygame.draw.line(s, (60, 35, 15), (c, c - 13), (c, c + 12), 2)
+        pygame.draw.polygon(s, (245, 240, 225), [(c - 12, c - 6), (c + 12, c - 6), (c + 9, c + 5), (c - 9, c + 5)])
+        pygame.draw.polygon(s, (30, 30, 30), [(c, c - 16), (c + 7, c - 14), (c, c - 12)])
+    elif key == "sub":      # yellow hull, tower and periscope
+        pygame.draw.ellipse(s, (235, 200, 60), (c - 16, c - 7, 32, 14))
+        pygame.draw.ellipse(s, (130, 100, 20), (c - 16, c - 7, 32, 14), 2)
+        pygame.draw.rect(s, (205, 170, 50), (c - 4, c - 12, 9, 8), border_radius=2)
+        pygame.draw.line(s, (90, 90, 100), (c + 2, c - 12), (c + 2, c - 18), 2)
+        pygame.draw.line(s, (90, 90, 100), (c + 2, c - 18), (c + 6, c - 18), 2)
+        for wx in (c - 9, c - 2, c + 5):
+            pygame.draw.circle(s, (120, 200, 240), (wx + 3, c), 2)
+    elif key == "shark":    # a fin cutting through the water
+        pygame.draw.ellipse(s, (60, 120, 180), (c - 14, c + 2, 28, 8))
+        pygame.draw.polygon(s, (110, 120, 135), [(c - 8, c + 5), (c + 9, c + 5), (c + 2, c - 14)])
+        pygame.draw.polygon(s, (60, 65, 80), [(c - 8, c + 5), (c + 9, c + 5), (c + 2, c - 14)], 2)
+        pygame.draw.line(s, (200, 230, 250), (c - 14, c + 7), (c - 4, c + 7), 2)
     if key == "dart":
         pygame.draw.circle(s, (125, 82, 45), (c, c), r)
         pygame.draw.circle(s, (195, 150, 100), (c, c), r - 7)
@@ -840,6 +1152,42 @@ def make_tower_sprite(key, font):
             a = i * math.pi / 5 - math.pi / 2
             star.append((c + rad * math.cos(a), c + rad * math.sin(a)))
         pygame.draw.polygon(s, (255, 215, 60), star)
+    elif key == "knight":   # silver helmet, visor slit, lightning plume
+        pygame.draw.circle(s, (175, 180, 195), (c, c), r - 1)
+        pygame.draw.circle(s, (90, 95, 110), (c, c), r - 1, 2)
+        pygame.draw.rect(s, (40, 45, 60), (c - 9, c - 1, 18, 4), border_radius=2)
+        pygame.draw.polygon(s, (255, 215, 60), [(c - 1, c - 18), (c + 5, c - 10), (c + 1, c - 10),
+                                                (c + 4, c - 3), (c - 4, c - 11), (c, c - 11)])
+    elif key == "witch":    # teal robe, wide pointy hat, wind swirl
+        pygame.draw.circle(s, (60, 170, 160), (c, c), r - 1)
+        pygame.draw.circle(s, (25, 90, 85), (c, c), r - 1, 2)
+        pygame.draw.ellipse(s, (30, 70, 80), (c - 15, c - 6, 30, 8))
+        pygame.draw.polygon(s, (30, 70, 80), [(c - 7, c - 3), (c + 7, c - 3), (c + 4, c - 18)])
+        pygame.draw.arc(s, WHITE, (c - 9, c + 1, 18, 12), math.radians(200), math.radians(360), 2)
+    elif key == "gear":     # orange, gear teeth, two goggles
+        for i in range(10):
+            a = i * math.pi / 5
+            pygame.draw.circle(s, (120, 120, 130), (int(c + (r - 1) * math.cos(a)), int(c + (r - 1) * math.sin(a))), 3)
+        pygame.draw.circle(s, (230, 140, 50), (c, c), r - 3)
+        for gx in (c - 5, c + 5):
+            pygame.draw.circle(s, (60, 60, 70), (gx, c - 2), 5)
+            pygame.draw.circle(s, (150, 220, 255), (gx, c - 2), 3)
+    elif key == "cipher":   # dark hoodie colors with a little laptop
+        pygame.draw.circle(s, (40, 50, 80), (c, c), r - 1)
+        pygame.draw.circle(s, (20, 25, 45), (c, c), r - 1, 2)
+        pygame.draw.rect(s, (150, 155, 170), (c - 10, c - 8, 20, 13), border_radius=2)
+        pygame.draw.rect(s, (20, 60, 30), (c - 8, c - 6, 16, 9))
+        for i in range(3):
+            pygame.draw.line(s, (90, 255, 120), (c - 6, c - 4 + i * 3), (c - 6 + 4 + i * 3, c - 4 + i * 3), 1)
+        pygame.draw.rect(s, (120, 125, 140), (c - 12, c + 5, 24, 3), border_radius=1)
+    elif key == "nova":     # violet with a glowing mind orb and orbiting sparks
+        pygame.draw.circle(s, (90, 40, 140), (c, c), r - 1)
+        pygame.draw.circle(s, (50, 20, 80), (c, c), r - 1, 2)
+        pygame.draw.circle(s, (220, 150, 255), (c, c), 7)
+        pygame.draw.circle(s, (255, 235, 255), (c, c), 4)
+        for i in range(4):
+            a = i * math.pi / 2 + 0.6
+            pygame.draw.circle(s, (240, 200, 255), (int(c + 12 * math.cos(a)), int(c + 12 * math.sin(a))), 2)
     elif key == "wizard":
         pygame.draw.circle(s, (110, 60, 170), (c, c), r)
         pygame.draw.circle(s, (55, 25, 95), (c, c), r, 2)
@@ -864,6 +1212,7 @@ def finish_tower_sprite(s):
 
 
 BARRELS = {   # (length, width, color) of the part that points at balloons
+    "gear": (20, 5, (70, 70, 80)),
     "dart": (22, 5, (70, 45, 25)),
     "bomb": (19, 10, (30, 30, 34)),
     "sniper": (28, 4, (40, 50, 25)),
@@ -882,7 +1231,8 @@ class Game:
         self.mp = MAPS[map_idx]
         self.diff = DIFFICULTIES[diff_idx]
         self.paths = [Path([(x, y + MAP_Y) for x, y in pts]) for pts in self.mp["paths"]]
-        self.blocked = [(x, y + MAP_Y, r) for x, y, r in self.mp.get("water", []) + self.mp.get("rocks", [])]
+        self.water = [(x, y + MAP_Y, r) for x, y, r in self.mp.get("water", [])]
+        self.blocked = self.water + [(x, y + MAP_Y, r) for x, y, r in self.mp.get("rocks", [])]
         self.reset()
 
     def reset(self):
@@ -898,7 +1248,9 @@ class Game:
         self.queue = []
         self.qi = 0
         self.rtime = 0.0
-        self.fast = False
+        self.speed = 1              # 1x / 2x / 3x
+        self.rally_t = 0.0          # Rally Cry: all towers faster
+        self.ab_idx = 0             # which ability is picked in the ability bar
         self.auto = bool(self.app.save.get("auto_start"))
         self.auto_wait = 0.0        # countdown before an auto-started round
         self.cx, self.cy = 240.0, MAP_Y + 240.0   # cursor
@@ -970,7 +1322,18 @@ class Game:
                 return t
         return None
 
-    def can_place(self, x, y):
+    def on_water(self, x, y):
+        return any((wx - x) ** 2 + (wy - y) ** 2 <= (wr - 10) ** 2 for wx, wy, wr in self.water)
+
+    def can_place(self, x, y, water=False):
+        """Land towers can't go on water; water towers must go on water."""
+        if water:
+            if not self.on_water(x, y):
+                return False
+            for t in self.towers:
+                if (t.x - x) ** 2 + (t.y - y) ** 2 < (TOWER_R * 2) ** 2:
+                    return False
+            return True
         if not (TOWER_R <= x <= SCREEN_W - TOWER_R and MAP_Y + TOWER_R <= y <= MAP_Y + MAP_H - TOWER_R):
             return False
         for path in self.paths:
@@ -984,11 +1347,11 @@ class Game:
                 return False
         return True
 
-    def spawn_balloon(self, name, dist, camo, seg=0, path=None):
+    def spawn_balloon(self, name, dist, camo, seg=0, path=None, regrow=None, fort=False):
         if path is None:   # a new balloon: take turns between the tracks
             path = self.paths[self.spawned % len(self.paths)]
             self.spawned += 1
-        b = Balloon(name, max(0.0, dist), camo, self.next_id, self.hp_mult, path)
+        b = Balloon(name, max(0.0, dist), camo, self.next_id, self.hp_mult, path, regrow, fort)
         self.next_id += 1
         b.x, b.y, b.seg = path.pos(b.dist, seg)
         self.balloons.append(b)
@@ -999,6 +1362,37 @@ class Game:
             self.fx.pop(0)
         self.fx.append([kind, x, y, 0.0, dur, data])
 
+    def check_hero_levels(self):
+        for t in self.towers:
+            if t.hero and t.xp_level() != t.hero_level:
+                t.hero_level = t.xp_level()
+                self.refresh_buffs()
+                self.toast("%s reached level %d!" % (t.t["name"], t.hero_level), 1.8)
+                self.add_fx("ring", t.x, t.y, 0.5, (TOWER_R + 14, (255, 215, 80)))
+                self.app.sounds.play("upgrade")
+
+    # ---------------------------------------------------------- saving
+    def snapshot(self):
+        """Everything needed to continue this game later (saved between rounds)."""
+        return dict(map=self.map_idx, diff=self.diff_idx, round=self.round, money=self.money,
+                    lives=self.lives, won=self.won,
+                    towers=[dict(key=t.key, x=t.x, y=t.y, levels=t.levels, target=t.target_mode,
+                                 curve=t.curve, spent=t.spent, pops=t.pops, xp=t.xp) for t in self.towers])
+
+    def restore(self, snap):
+        self.round, self.money, self.lives, self.won = snap["round"], snap["money"], snap["lives"], snap["won"]
+        types = {tt["key"]: tt for tt in SHOP}
+        for d in snap["towers"]:
+            if d["key"] not in types:
+                continue
+            t = Tower(types[d["key"]], d["x"], d["y"], d["spent"])
+            t.levels = list(d["levels"])
+            t.target_mode, t.curve, t.pops, t.xp = d["target"], d["curve"], d["pops"], d["xp"]
+            if t.hero:
+                t.hero_level = t.xp_level()
+            self.towers.append(t)
+        self.refresh_buffs()
+
     # ---------------------------------------------------------- rounds
     def start_round(self):
         self.round += 1
@@ -1006,9 +1400,12 @@ class Game:
         q = []
         for g in groups:
             name, count, spacing, delay = g[:4]
-            camo = g[4] if len(g) > 4 else False
+            flags = g[4] if len(g) > 4 else ""   # True = camo, or letters: c=camo r=regrow f=fortified
+            camo = flags is True or (isinstance(flags, str) and "c" in flags)
+            regrow = name if isinstance(flags, str) and "r" in flags else None
+            fort = isinstance(flags, str) and "f" in flags
             for i in range(count):
-                q.append((delay + i * spacing, name, camo))
+                q.append((delay + i * spacing, name, (camo, regrow, fort)))
         q.sort(key=lambda e: e[0])
         self.queue, self.qi, self.rtime = q, 0, 0.0
         self.hp_mult = 1.0 + max(0, self.round - len(ROUNDS)) * 0.06
@@ -1027,8 +1424,13 @@ class Game:
                 lives += t.s.get("lives", 0)
                 self.add_fx("text", t.x, t.y - 20, 1.2, "+$%d" % pay)
         self.money += bonus + income
+        for t in self.towers:   # heroes learn from every round, too
+            if t.hero:
+                t.xp += 30 + 3 * self.round
+        self.check_hero_levels()
         self.lives += lives
         self.app.record_best(self.map_idx, self.diff_idx, self.round)
+        self.app.save_resume(self.snapshot())
         self.toast("Round %d done! +$%d" % (self.round, bonus + income))
         if self.round == WIN_ROUND and not self.won:
             self.won = True
@@ -1051,11 +1453,13 @@ class Game:
         self.money += 1
         if tower:
             tower.pops += 1
+            if tower.hero:
+                tower.xp += 1
         self.add_fx("pop", b.x, b.y, 0.32, (b.info["color"], b.id))
         self.app.sounds.play("pop")
         kids = []
         for i, child in enumerate(b.info["children"]):
-            nb = self.spawn_balloon(child, b.dist - i * 9, b.camo, b.seg, b.path)
+            nb = self.spawn_balloon(child, b.dist - i * 9, b.camo, b.seg, b.path, b.regrow)
             kids.append(nb)
             if proj:
                 proj.hit.add(nb.id)
@@ -1154,6 +1558,133 @@ class Game:
         self.add_fx("ring", t.x, t.y, 0.35, (r, (190, 235, 255)))
         return True
 
+    def rate_of(self, t):
+        """Seconds between attacks, after ability speed-ups."""
+        rate = t.s["rate"]
+        if t.frenzy_t > 0:
+            rate *= t.frenzy_rate
+        if self.rally_t > 0:
+            rate *= 0.5
+        return rate
+
+    # ---------------------------------------------------------- abilities
+    def ability_list(self):
+        """Every unlocked ability on the field: [(tower, ability id)]."""
+        return [(t, a) for t in self.towers for a in t.abilities()]
+
+    def use_ability(self, t, aid):
+        left = t.ab_cool.get(aid, 0)
+        if left > 0:
+            self.toast("%s ready in %ds" % (ABILITIES[aid][0], math.ceil(left)))
+            self.app.sounds.play("error")
+            return
+        t.ab_cool[aid] = ABILITIES[aid][1]
+        self.toast(ABILITIES[aid][0] + "!", 1.2)
+        self.app.sounds.play("upgrade")
+        s = t.s
+        on_screen = [b for b in self.balloons if b.alive and MAP_Y - 10 < b.y < PANEL_Y + 10 and -10 < b.x < SCREEN_W + 10]
+        if aid in ("dart_storm", "overdrive"):
+            t.frenzy_t, t.frenzy_rate, t.frenzy_count = (6.0, 0.25, 3) if aid == "dart_storm" else (8.0, 1 / 3, 0)
+        elif aid == "tack_nova":
+            for i in range(48):
+                a = i * 2 * math.pi / 48
+                self.projs.append(Proj("tack", t.x, t.y, a, 420, 0.9, max(1, s["dmg"]), 4, s["dtype"], 5, t))
+        elif aid == "rang_barrage":
+            for i in range(12):
+                sign = 1 if i % 2 else -1
+                pr = Proj("boom", t.x, t.y, i * math.pi / 6, s["speed"], 2 * math.pi * 70 / s["speed"],
+                          s["dmg"], s["pierce"] + 4, s["dtype"], 10, t)
+                pr.turn = sign * s["speed"] / 70
+                self.projs.append(pr)
+        elif aid in ("carpet_bomb", "meteor"):
+            front = sorted(on_screen, key=lambda b: b.dist - b.path.total)
+            if aid == "meteor":
+                front = sorted(on_screen, key=lambda b: (-b.rank, b.dist - b.path.total))[:1]
+            for b in front[:8]:
+                boom = Proj("bomb", b.x, b.y, 0, 0, 0, 20 if aid == "meteor" else 4, 60 if aid == "meteor" else 30,
+                            "normal" if aid == "meteor" else "explode", 0, t)
+                boom.blast = 95 if aid == "meteor" else 70
+                boom.bm = 3
+                self.explode(boom)
+        elif aid == "glue_rain":
+            rain = dict(s, glue_blimp=True)
+            for b in on_screen:
+                self.apply_glue(b, rain, t)
+        elif aid == "blizzard":
+            for b in on_screen:
+                b.frozen = max(b.frozen, 3.0)
+            self.add_fx("ring", SCREEN_W // 2, MAP_Y + MAP_H // 2, 0.5, (300, (200, 240, 255)))
+        elif aid == "smoke_bomb":
+            for b in on_screen:
+                if not b.info.get("blimp"):
+                    b.dist = max(0.0, b.dist - 90)
+                b.frozen = max(b.frozen, 1.5)
+        elif aid in ("cash_crate", "payday"):
+            cash = 300 if aid == "cash_crate" else 600
+            self.money += cash
+            self.add_fx("text", t.x, t.y - 20, 1.2, "+$%d" % cash)
+        elif aid == "spike_carpet":
+            self.make_spikes(t)   # makes sure the reachable spots are known
+            for x, y in random.sample(t.spots[1], min(25, len(t.spots[1]))):
+                self.spikes.append([x, y, t.s["pierce"], t.s["life"], t])
+        elif aid == "rally_cry":
+            self.rally_t = 8.0
+        elif aid == "broadside":
+            for i in range(16):
+                pr = Proj("cannon", t.x, t.y, i * math.pi / 8, s["speed"], (s["range"] + 60) / s["speed"],
+                          s["dmg"], s["pierce"] + 2, s["dtype"], 6, t)
+                self.projs.append(pr)
+        elif aid == "depth_charge":
+            for b in sorted(on_screen, key=lambda b: b.dist - b.path.total)[:6]:
+                boom = Proj("bomb", b.x, b.y, 0, 0, 0, 5, 30, "explode", 0, t)
+                boom.blast, boom.bm = 60, 3
+                self.explode(boom)
+        elif aid == "feeding_frenzy":
+            t.frenzy_t, t.frenzy_rate, t.frenzy_count = 8.0, 1 / 3, 0
+        else:
+            self.hero_ability(t, aid, on_screen)
+
+    def hero_ability(self, t, aid, on_screen):
+        lvl = t.hero_level
+        front = sorted(on_screen, key=lambda b: b.dist - b.path.total)
+        if aid == "thunder_strike" and front:
+            self.lightning(t, front[0], 15, 3 + lvl // 5, "normal")
+        elif aid in ("storm_blade", "overclock"):
+            t.frenzy_t, t.frenzy_rate, t.frenzy_count = (10.0, 1 / 3, 0) if aid == "storm_blade" else (8.0, 1 / 3, 2)
+        elif aid == "twister":
+            for b in on_screen:
+                if (b.x - t.x) ** 2 + (b.y - t.y) ** 2 <= 170 ** 2:
+                    b.dist = max(0.0, b.dist - (40 if b.info.get("blimp") else 130))
+            self.add_fx("ring", t.x, t.y, 0.4, (170, (200, 255, 240)))
+        elif aid == "hurricane":
+            for b in on_screen:
+                b.slow = max(b.slow, 8.0)
+                self.damage(b, 2, "normal", None, t)
+        elif aid == "mega_mortar" and on_screen:
+            target = sorted(on_screen, key=lambda b: (-b.rank, b.dist - b.path.total))[0]
+            boom = Proj("bomb", target.x, target.y, 0, 0, 0, 12, 80, "explode", 0, t)
+            boom.blast, boom.bm = 110, 3
+            self.explode(boom)
+        elif aid == "crypto_boost":
+            cash = 200 + 30 * lvl
+            self.money += cash
+            self.add_fx("text", t.x, t.y - 20, 1.2, "+$%d" % cash)
+        elif aid == "glitch_wave":
+            for b in on_screen:
+                b.camo = False
+                b.regrow = None
+                self.damage(b, 30 if b.info.get("blimp") else 1, "normal", None, t)
+        elif aid == "mind_blast":
+            for b in on_screen:
+                if (b.x - t.x) ** 2 + (b.y - t.y) ** 2 <= 200 ** 2:
+                    b.frozen = max(b.frozen, 1.0)
+                    self.damage(b, 3, "normal", None, t)
+            self.add_fx("ring", t.x, t.y, 0.4, (200, (220, 150, 255)))
+        elif aid == "gravity_well":
+            for b in front[:30]:
+                if b.name != "titan":
+                    b.lift, b.lift_t, b.lift_by = (2.0 if b.info.get("blimp") else 4.0), 0.3, t
+
     def update_tower(self, t, dt):
         s = t.s
         t.flash = max(0.0, t.flash - dt)
@@ -1166,18 +1697,18 @@ class Game:
                 t.cool2 = 0.12 if ft else 0.05
                 if ft:
                     a = math.atan2(ft.y - t.y, ft.x - t.x) + random.uniform(-0.15, 0.15)
-                    self.projs.append(Proj("fire", t.x, t.y, a, 320, 0.36, 1, 2, "normal", 8, t))
+                    self.projs.append(Proj("fire", t.x, t.y, a, 320, 0.36, 1, 2, "magic", 8, t))
         t.cool -= dt
         if t.cool > 0:
             return
         if t.key == "frost":
-            t.cool = s["rate"] if self.frost_pulse(t) else 0.1
+            t.cool = self.rate_of(t) if self.frost_pulse(t) else 0.1
             return
         if t.key == "village":
             return
         if t.key == "spike":
             if self.active:   # spikes are only made during a round
-                t.cool = s["rate"]
+                t.cool = self.rate_of(t)
                 self.make_spikes(t)
             else:
                 t.cool = 0.0
@@ -1186,7 +1717,7 @@ class Game:
         if tgt is None:
             t.cool = 0.05
             return
-        t.cool = s["rate"]
+        t.cool = self.rate_of(t)
         t.flash = 0.08
         if t.key == "dart" and s.get("spikeball"):
             ax, ay = self.lead(t, tgt, 330)
@@ -1195,18 +1726,27 @@ class Game:
                         330, 8.0, 2, 40, "normal", 12, t)
             ball.bounces = 1
             self.projs.append(ball)
-        elif t.key in ("dart", "ninja", "super", "glue"):
-            kind = {"dart": "dart", "ninja": "star", "super": "laser", "glue": "glue"}[t.key]
+        elif t.key == "knight":   # sword slash: hits a group around the knight
+            self.knight_slash(t, tgt)
+        elif t.key == "nova":
+            self.nova_lift(t)
+        elif t.key == "shark":
+            self.knight_slash(t, tgt, "chomp")
+        elif t.key in ("dart", "ninja", "super", "glue", "witch", "gear", "cipher", "pirate", "sub"):
+            kind = {"dart": "dart", "ninja": "star", "super": "laser", "glue": "glue",
+                    "witch": "gust", "gear": "laser", "cipher": "zap", "pirate": "cannon",
+                    "sub": "torpedo"}[t.key]
             ax, ay = self.lead(t, tgt, s["speed"])
             t.angle = math.atan2(ay - t.y, ax - t.x)
-            n = s["count"]
+            n = max(s["count"], t.frenzy_count if t.frenzy_t > 0 else 0)
             for i in range(n):
-                a = t.angle + s["spread"] * (i - (n - 1) / 2)
+                a = t.angle + (s["spread"] or 0.15) * (i - (n - 1) / 2)
                 pr = Proj(kind, t.x + math.cos(a) * 16, t.y + math.sin(a) * 16, a, s["speed"],
                           (s["range"] + 40) / s["speed"], s.get("dmg", 0), s["pierce"], s.get("dtype"),
                           7 if kind == "glue" else 5, t)
                 pr.homing = s.get("homing", False)
                 pr.bm = s.get("blimp_mult", 1)
+                pr.knock = s.get("knock", 0)
                 self.projs.append(pr)
             if s.get("stun"):
                 t.shots += 1
@@ -1302,7 +1842,37 @@ class Game:
                 self.explode(boom)
         self.spikes = [sp for sp in self.spikes if sp[2] > 0 and sp[3] > 0]
 
-    def lightning(self, t, first, jumps, dmg):
+    def knight_slash(self, t, first, fx="slash"):
+        """Hit a group around the tower: the Spark Knight's sword, the Shark's bite."""
+        s = t.s
+        t.angle = math.atan2(first.y - t.y, first.x - t.x)
+        near = [b for b in self.query(t.x, t.y, s["range"]) if b.alive and (not b.camo or s["camo"])
+                and (b.x - t.x) ** 2 + (b.y - t.y) ** 2 <= (s["range"] + b.r) ** 2]
+        near.sort(key=lambda b: b.dist - b.path.total)
+        for b in near[:s["pierce"]]:
+            if s.get("knock") and not b.info.get("blimp"):
+                b.dist = max(0.0, b.dist - s["knock"])
+            self.damage(b, s["dmg"] * (s.get("blimp_mult", 1) if b.info.get("blimp") else 1), s["dtype"], None, t)
+        if fx == "chomp":
+            self.add_fx("chomp", first.x, first.y, 0.2)
+        else:
+            self.add_fx("slash", t.x, t.y, 0.18, (t.angle, s["range"]))
+
+    def nova_lift(self, t):
+        """Lift the front balloons into the air, where they float and take damage."""
+        s = t.s
+        cands = [b for b in self.query(t.x, t.y, s["range"]) if b.alive and b.lift <= 0
+                 and (not b.camo or s["camo"]) and not b.info.get("blimp")
+                 and (s["lift_heavy"] or (b.name != "ceramic" and not b.fort))
+                 and (b.x - t.x) ** 2 + (b.y - t.y) ** 2 <= (s["range"] + b.r) ** 2]
+        cands.sort(key=lambda b: b.dist - b.path.total)
+        for b in cands[:s["lift_n"]]:
+            b.lift, b.lift_t, b.lift_by = s["lift_time"], 0.3, t
+            self.add_fx("line", t.x, t.y, 0.12, (b.x, b.y - 10))
+        if not cands:
+            t.cool = 0.1
+
+    def lightning(self, t, first, jumps, dmg, dtype="magic"):
         """Lightning hits one balloon, then jumps to the nearest new one."""
         hit = set()
         x0, y0 = t.x, t.y
@@ -1311,7 +1881,7 @@ class Game:
             hit.add(b.id)
             self.add_fx("bolt", x0, y0, 0.12, (b.x, b.y))
             x0, y0 = b.x, b.y
-            self.damage(b, dmg, "normal", None, t)
+            self.damage(b, dmg, dtype, None, t)
             nxt, best = None, 90 ** 2
             for c in self.query(x0, y0, 90):
                 if c.alive and c.id not in hit:
@@ -1343,12 +1913,13 @@ class Game:
         if self.active:
             self.rtime += dt
             while self.qi < len(self.queue) and self.queue[self.qi][0] <= self.rtime:
-                _, name, camo = self.queue[self.qi]
+                _, name, (camo, regrow, fort) = self.queue[self.qi]
                 self.qi += 1
-                self.spawn_balloon(name, 0.0, camo)
+                self.spawn_balloon(name, 0.0, camo, regrow=regrow, fort=fort)
 
         base = BALLOON_SPEED * self.diff["speed"]
         acid_hits = []
+        lift_hits = []
         for b in self.balloons:
             if not b.alive:
                 continue
@@ -1359,6 +1930,13 @@ class Game:
             elif b.slow > 0:
                 b.slow -= dt
                 sp *= 0.5
+            if b.regrow and b.name != b.regrow and b.name in REGROW_UP:
+                b.regrow_t += dt
+                if b.regrow_t >= REGROW_TIME:   # grow a layer back
+                    b.regrow_t = 0.0
+                    up = REGROW_UP[b.name]
+                    if BALLOON_ORDER.index(up) <= BALLOON_ORDER.index(b.regrow):
+                        b.set_type(up)
             if b.glue > 0:
                 b.glue -= dt
                 sp *= 1 - b.glue_slow
@@ -1367,6 +1945,13 @@ class Game:
                     if b.acid_t <= 0:
                         b.acid_t = b.acid
                         acid_hits.append(b)
+            if b.lift > 0:   # floating helplessly, taking damage
+                b.lift -= dt
+                sp = 0.0
+                b.lift_t -= dt
+                if b.lift_t <= 0:
+                    b.lift_t = 0.6
+                    lift_hits.append(b)
             b.speed_now = sp
             b.dist += sp * dt
             if b.dist >= b.path.total:
@@ -1378,9 +1963,17 @@ class Game:
 
         for b in acid_hits:
             self.damage(b, 1, "normal", None, b.glue_by)
+        for b in lift_hits:
+            if b.lift_by:
+                self.damage(b, b.lift_by.s.get("dmg", 1), "normal", None, b.lift_by)
 
         self.build_grid()
+        self.rally_t = max(0.0, self.rally_t - dt)
         for t in self.towers:
+            t.frenzy_t = max(0.0, t.frenzy_t - dt)
+            if self.active:
+                for aid in t.ab_cool:
+                    t.ab_cool[aid] = max(0.0, t.ab_cool[aid] - dt)
             self.update_tower(t, dt)
         self.update_spikes(dt)
 
@@ -1450,6 +2043,8 @@ class Game:
                             p.dead = True
                             break
                         continue
+                    if p.kind == "zap" and p.tower.s.get("decamo"):
+                        b.camo = False   # Cipher's zaps strip camo
                     if p.knock and not b.info.get("blimp"):
                         b.dist = max(0.0, b.dist - p.knock)
                     self.damage(b, p.dmg * (p.bm if b.info.get("blimp") else 1), p.dtype, p, p.tower)
@@ -1458,6 +2053,7 @@ class Game:
                         p.dead = True
                         break
 
+        self.check_hero_levels()
         self.balloons = [b for b in self.balloons if b.alive]
         self.projs = [p for p in self.projs if not p.dead]
 
@@ -1465,6 +2061,7 @@ class Game:
             self.lives = 0
             self.active = False
             self.overlay, self.over_idx = "over", 0
+            self.app.clear_resume()   # nothing to continue after a game over
             return
         if self.active and self.qi >= len(self.queue) and not self.balloons:
             self.end_round()
@@ -1481,8 +2078,8 @@ class Game:
             return
 
         if "SELECT" in inp.pressed:
-            self.fast = not self.fast
-            self.toast("Speed: %s" % ("FAST >>" if self.fast else "Normal"), 1.0)
+            self.speed = self.speed % 3 + 1
+            self.toast("Speed: %dx" % self.speed, 1.0)
         if "START" in inp.pressed:
             if self.active:
                 self.overlay, self.over_idx = "pause", 0
@@ -1501,7 +2098,28 @@ class Game:
                 self.start_round()
                 self.toast("Round %d" % self.round, 1.2)
 
-        if self.mode == "menu":
+        chord = {"L", "R"} <= inp.held and ("L" in inp.pressed or "R" in inp.pressed)
+        if chord or "ABILITY" in inp.pressed:
+            if self.mode == "abilities":
+                self.mode = "normal"
+            elif self.ability_list():
+                self.mode = "abilities"
+                self.ab_idx = min(self.ab_idx, len(self.ability_list()) - 1)
+            else:
+                self.toast("No abilities yet: get a middle-path level 3")
+        elif self.mode == "abilities":
+            abil = self.ability_list()
+            if not abil or "B" in inp.pressed:
+                self.mode = "normal"
+            else:
+                if "LEFT" in inp.repeat:
+                    self.ab_idx = (self.ab_idx - 1) % len(abil)
+                if "RIGHT" in inp.repeat:
+                    self.ab_idx = (self.ab_idx + 1) % len(abil)
+                self.ab_idx %= len(abil)
+                if "A" in inp.pressed:
+                    self.use_ability(*abil[self.ab_idx])
+        elif self.mode == "menu":
             self.update_menu(inp)
         else:
             self.move_cursor(dt, inp)
@@ -1511,8 +2129,8 @@ class Game:
                 self.update_place(inp)
 
         # Simulate in small steps so fast shots don't skip past balloons.
-        sim = dt * (2 if self.fast else 1)
-        steps = max(1, min(8, int(math.ceil(sim / (1 / 60.0)))))
+        sim = dt * self.speed
+        steps = max(1, min(12, int(math.ceil(sim / (1 / 60.0)))))
         for _ in range(steps):
             if self.overlay:
                 break
@@ -1543,22 +2161,25 @@ class Game:
 
     def update_place(self, inp):
         if "L" in inp.repeat:
-            self.shop = (self.shop - 1) % len(TOWER_TYPES)
+            self.shop = (self.shop - 1) % len(SHOP)
         if "R" in inp.repeat:
-            self.shop = (self.shop + 1) % len(TOWER_TYPES)
+            self.shop = (self.shop + 1) % len(SHOP)
         if "B" in inp.pressed:
             self.mode = "normal"
         if "A" in inp.pressed:
-            tt = TOWER_TYPES[self.shop]
+            tt = SHOP[self.shop]
             cost = self.place_cost(tt, self.cx, self.cy)
             existing = self.tower_at(self.cx, self.cy)
             if existing:
                 self.open_menu(existing)
+            elif tt.get("hero") and any(t.hero for t in self.towers):
+                self.toast("Only one hero at a time")
+                self.app.sounds.play("error")
             elif self.money < cost:
                 self.toast("Need $%d more" % (cost - self.money))
                 self.app.sounds.play("error")
-            elif not self.can_place(self.cx, self.cy):
-                self.toast("Can't build there")
+            elif not self.can_place(self.cx, self.cy, tt.get("water", False)):
+                self.toast("Must go on water" if tt.get("water") else "Can't build there")
                 self.app.sounds.play("error")
             else:
                 self.money -= cost
@@ -1574,7 +2195,10 @@ class Game:
 
     def menu_rows(self, t):
         """What's in a tower's menu, top to bottom."""
-        rows = ["upgrade0", "upgrade1", "target"]
+        rows = ["hero"] if t.hero else []
+        rows += ["upgrade%d" % p for p in range(len(t.t["paths"]))]
+        rows += ["ability:" + a for a in t.abilities()]
+        rows.append("target")
         if t.key == "boom":
             rows.append("curve")
         return rows + ["sell"]
@@ -1606,13 +2230,17 @@ class Game:
                 t.target_mode = (t.target_mode + 1) % len(TARGET_MODES)
         if "A" not in inp.pressed:
             return
-        if row in ("upgrade0", "upgrade1"):
-            p = self.menu
+        if row.startswith("ability:"):
+            self.use_ability(t, row[8:])
+        elif row.startswith("upgrade"):
+            p = int(row[7:])
             state = t.upgrade_state(p)
             if state == "max":
                 self.toast("That path is maxed out")
             elif state == "locked":
                 self.toast("Only one path can reach level 3")
+            elif state == "two":
+                self.toast("Only 2 paths per tower")
             else:
                 cost = self.upgrade_cost(t, p)
                 if self.money < cost:
@@ -1712,9 +2340,26 @@ class Game:
             else:
                 spr, ox, oy = app.balloon_sprites[(b.name, b.camo)]
                 bob = 0 if b.frozen > 0 else math.sin(now * 5 + b.id) * 1.5   # gentle float
+                if b.lift > 0:   # held up in the air by Nova
+                    bob = -12 + math.sin(now * 8 + b.id) * 2
+                    pygame.draw.circle(surf, (210, 140, 255), (int(b.x), int(b.y + bob)), b.r + 4, 2)
                 surf.blit(spr, (b.x - ox, b.y - oy + bob))
                 if b.frozen > 0:
                     surf.blit(app.ice_sprite(b.r), (b.x - b.r - 3, b.y - b.r - 3))
+            if b.fort:   # armored band
+                if b.info.get("blimp"):
+                    w = b.info["w"] * 0.9
+                    pygame.draw.ellipse(surf, (170, 175, 185), (b.x - w / 2, b.y - b.r * 0.6, w, b.r * 1.2), 4)
+                else:
+                    pygame.draw.circle(surf, (170, 175, 185), (int(b.x), int(b.y)), b.r + 1, 3)
+                    for a in (0.6, 2.2, 3.8, 5.4):
+                        pygame.draw.circle(surf, (90, 95, 105), (int(b.x + math.cos(a) * b.r), int(b.y + math.sin(a) * b.r)), 2)
+            if b.regrow:   # little green "grows back" badge
+                gx, gy = int(b.x + b.r * 0.75), int(b.y - b.r * 0.75)
+                pygame.draw.circle(surf, (40, 120, 50), (gx, gy), 6)
+                pygame.draw.circle(surf, (120, 240, 120), (gx, gy), 5)
+                pygame.draw.line(surf, WHITE, (gx - 3, gy), (gx + 3, gy), 2)
+                pygame.draw.line(surf, WHITE, (gx, gy - 3), (gx, gy + 3), 2)
             if b.glue > 0:
                 gx, gy = int(b.x), int(b.y - b.r * 0.4)
                 col = (150, 230, 60) if not b.acid else (210, 250, 40)
@@ -1737,6 +2382,21 @@ class Game:
                 pygame.draw.circle(surf, (60, 60, 70), (cx, cy), 11)
                 pygame.draw.circle(surf, (110, 110, 125), (cx - 3, cy - 3), 5)
                 pygame.draw.circle(surf, (30, 30, 36), (cx, cy), 11, 2)
+            elif p.kind == "cannon":
+                pygame.draw.circle(surf, (30, 30, 34), (int(p.x), int(p.y)), 6)
+                pygame.draw.circle(surf, (110, 110, 120), (int(p.x) - 2, int(p.y) - 2), 2)
+            elif p.kind == "torpedo":
+                ex, ey = math.cos(p.angle) * 8, math.sin(p.angle) * 8
+                pygame.draw.line(surf, (70, 75, 90), (p.x - ex, p.y - ey), (p.x + ex, p.y + ey), 6)
+                pygame.draw.circle(surf, (230, 90, 60), (int(p.x + ex), int(p.y + ey)), 3)
+                pygame.draw.circle(surf, (220, 240, 255), (int(p.x - ex * 1.6), int(p.y - ey * 1.6)), 2)
+            elif p.kind == "gust":
+                for k in range(3):
+                    off = k * 2.1 + p.life * 14
+                    pygame.draw.circle(surf, (210, 245, 240), (int(p.x + math.cos(off) * 5), int(p.y + math.sin(off) * 5)), 4 - k, 2)
+            elif p.kind == "zap":
+                pygame.draw.rect(surf, (90, 255, 120), (int(p.x) - 3, int(p.y) - 3, 7, 7))
+                pygame.draw.rect(surf, (20, 90, 40), (int(p.x) - 3, int(p.y) - 3, 7, 7), 1)
             elif p.kind == "star":
                 pts = []
                 for i in range(8):
@@ -1747,7 +2407,7 @@ class Game:
                 pygame.draw.polygon(surf, (60, 60, 70), pts, 1)
             elif p.kind == "laser":
                 ex, ey = math.cos(p.angle) * 10, math.sin(p.angle) * 10
-                col = (255, 90, 90) if p.dtype == "normal" else (120, 210, 255)
+                col = (255, 90, 90) if p.dtype in ("normal", "magic") else (120, 210, 255)
                 pygame.draw.line(surf, col, (p.x - ex, p.y - ey), (p.x + ex, p.y + ey), 4)
             elif p.kind == "glue":
                 pygame.draw.circle(surf, (150, 230, 60), (int(p.x), int(p.y)), 6)
@@ -1764,7 +2424,7 @@ class Game:
                 pygame.draw.circle(surf, (255, 120, 20), (int(p.x), int(p.y)), 8)
                 pygame.draw.circle(surf, (255, 230, 90), (int(p.x), int(p.y)), 4)
             elif p.kind == "tack":
-                col = (255, 140, 30) if p.dtype == "normal" else (220, 220, 230)
+                col = (255, 140, 30) if p.dtype in ("normal", "magic") else (220, 220, 230)
                 pygame.draw.circle(surf, col, (int(p.x), int(p.y)), 4)
                 pygame.draw.circle(surf, (60, 60, 70), (int(p.x), int(p.y)), 4, 1)
             else:
@@ -1777,9 +2437,11 @@ class Game:
         if self.mode == "menu" and self.sel:
             self.draw_range(surf, self.sel.x, self.sel.y, self.sel.s["range"], True)
         elif self.mode == "place":
-            tt = TOWER_TYPES[self.shop]
-            ok = self.can_place(self.cx, self.cy) and self.money >= self.place_cost(tt, self.cx, self.cy)
-            self.draw_range(surf, self.cx, self.cy, tt["base"]["range"], ok)
+            tt = SHOP[self.shop]
+            ok = self.can_place(self.cx, self.cy, tt.get("water", False)) and \
+                self.money >= self.place_cost(tt, self.cx, self.cy)
+            rng = hero_stats(tt["key"], 1)["range"] if tt.get("hero") else tt["base"]["range"]
+            self.draw_range(surf, self.cx, self.cy, rng, ok)
             surf.blit(app.ghost_sprites[tt["key"]], (self.cx - 22, self.cy - 22))
         else:
             t = self.tower_at(self.cx, self.cy)
@@ -1796,6 +2458,7 @@ class Game:
 
         self.draw_hud(surf)
         self.draw_panel(surf)
+        self.draw_ability_bar(surf)
         if self.mode == "menu" and self.sel:
             self.draw_menu(surf)
         if self.auto_wait > 0 and not self.active:
@@ -1816,8 +2479,46 @@ class Game:
             spr = self.app.range_sprite(int(r), ok)
             surf.blit(spr, (x - spr.get_width() // 2, y - spr.get_height() // 2))
 
+    def draw_ability_bar(self, surf):
+        """Round ability buttons along the bottom of the field."""
+        app = self.app
+        abil = self.ability_list()[:9]
+        if not abil:
+            return
+        y = PANEL_Y - 28
+        x0 = SCREEN_W - 26 - 46 * (len(abil) - 1)
+        for i, (t, aid) in enumerate(abil):
+            x = x0 + i * 46
+            left = t.ab_cool.get(aid, 0)
+            pygame.draw.circle(surf, (20, 22, 32), (x, y), 21)
+            surf.blit(app.mini_sprite(t.key), (x - 15, y - 15))
+            if left > 0:   # dark "clock" sweep while recharging
+                frac = left / ABILITIES[aid][1]
+                cover = pygame.Surface((42, 42), pygame.SRCALPHA)
+                pts = [(21, 21)] + [(21 + 21 * math.sin(a / 20 * frac * 2 * math.pi),
+                                     21 - 21 * math.cos(a / 20 * frac * 2 * math.pi)) for a in range(21)]
+                pygame.draw.polygon(cover, (0, 0, 0, 150), pts)
+                surf.blit(cover, (x - 21, y - 21))
+                img = app.text(app.f_small, str(math.ceil(left)), WHITE)
+                surf.blit(img, img.get_rect(center=(x, y)))
+            ring = YELLOW if left <= 0 else (90, 95, 115)
+            pygame.draw.circle(surf, ring, (x, y), 21, 3 if left <= 0 else 2)
+            if self.mode == "abilities" and i == self.ab_idx:
+                pygame.draw.circle(surf, WHITE, (x, y), 25, 3)
+                name = app.text(app.f_small, ABILITIES[aid][0], WHITE)
+                r = name.get_rect(midbottom=(min(SCREEN_W - name.get_width() // 2 - 6,
+                                                 max(name.get_width() // 2 + 6, x)), y - 28))
+                pygame.draw.rect(surf, DARK, r.inflate(12, 6), border_radius=6)
+                surf.blit(name, r)
+
     def draw_tower(self, surf, t):
         surf.blit(self.app.tower_sprites[t.key], (t.x - 22, t.y - 22))
+        if t.hero:   # gold level badge
+            bx, by = int(t.x + 14), int(t.y + 14)
+            pygame.draw.circle(surf, (120, 80, 10), (bx, by), 10)
+            pygame.draw.circle(surf, (255, 205, 60), (bx, by), 9)
+            img = self.app.text(self.app.f_tiny, str(t.hero_level), (60, 35, 0))
+            surf.blit(img, img.get_rect(center=(bx, by + 1)))
         if t.key in BARRELS:
             length, width, col = BARRELS[t.key]
             if t.flash > 0:
@@ -1825,10 +2526,11 @@ class Game:
             ex, ey = t.x + math.cos(t.angle) * length, t.y + math.sin(t.angle) * length
             pygame.draw.line(surf, col, (t.x, t.y), (ex, ey), width)
             pygame.draw.circle(surf, col, (int(t.x), int(t.y)), width // 2 + 3)
-        for p, col, x0 in ((0, (255, 120, 80), t.x - 17), (1, (90, 170, 255), t.x + 3)):
+        for p in range(len(t.levels)):
+            x0 = t.x - 20 + p * 14
             for i in range(3):
-                rect = (x0 + i * 5, t.y + TOWER_R + 2, 4, 4)
-                pygame.draw.rect(surf, col if i < t.levels[p] else (40, 40, 40), rect)
+                rect = (x0 + i * 4, t.y + TOWER_R + 3, 3, 4)
+                pygame.draw.rect(surf, PATH_COLORS[p] if i < t.levels[p] else (40, 40, 40), rect)
 
     def draw_fx(self, surf):
         app = self.app
@@ -1854,6 +2556,18 @@ class Game:
                 mx = (x + data[0]) / 2 + random.uniform(-8, 8)
                 my = (y + data[1]) / 2 + random.uniform(-8, 8)
                 pygame.draw.lines(surf, (200, 230, 255), False, [(x, y), (mx, my), data], 3)
+            elif kind == "chomp":   # two jaws snapping shut
+                gap = int(10 * (1 - p))
+                for side in (-1, 1):
+                    y0 = y + side * (gap + 4)
+                    pygame.draw.arc(surf, WHITE, (x - 12, y0 - 8, 24, 16), 0 if side > 0 else math.pi,
+                                    math.pi if side > 0 else 2 * math.pi, 3)
+            elif kind == "slash":
+                ang, rad = data
+                rect = pygame.Rect(x - rad, y - rad, rad * 2, rad * 2)
+                sweep = -ang - 1.2 + 2.4 * p
+                pygame.draw.arc(surf, (255, 240, 120), rect, sweep - 0.8, sweep + 0.8, 5)
+                pygame.draw.arc(surf, (140, 220, 255), rect.inflate(-14, -14), sweep - 0.6, sweep + 0.6, 3)
             elif kind == "clink":
                 pygame.draw.circle(surf, (200, 200, 210), (int(x), int(y)), 4 + int(6 * p), 2)
             elif kind == "text":
@@ -1883,19 +2597,19 @@ class Game:
         rtxt = "Round %d/%d" % (max(1, self.round), WIN_ROUND) if self.round <= WIN_ROUND \
             else "Round %d" % self.round
         img = app.text(app.f_norm, rtxt, WHITE)
-        surf.blit(img, (SCREEN_W - img.get_width() - (44 if self.fast else 10), 8))
-        if self.fast:
-            for i in range(2):
-                x = SCREEN_W - 36 + i * 13
+        surf.blit(img, (SCREEN_W - img.get_width() - (16 + 13 * self.speed if self.speed > 1 else 10), 8))
+        if self.speed > 1:
+            for i in range(self.speed):
+                x = SCREEN_W - 10 - 13 * self.speed + i * 13
                 pygame.draw.polygon(surf, YELLOW, [(x, 11), (x + 12, 20), (x, 29)])
 
     def draw_shop_strip(self, surf, highlight):
         app = self.app
-        shown = min(SHOP_SLOTS, len(TOWER_TYPES))
+        shown = min(SHOP_SLOTS, len(SHOP))
         slot_w = SCREEN_W // shown
-        first = max(0, min(self.shop - shown // 2, len(TOWER_TYPES) - shown))
+        first = max(0, min(self.shop - shown // 2, len(SHOP) - shown))
         for i in range(first, first + shown):
-            tt = TOWER_TYPES[i]
+            tt = SHOP[i]
             x = (i - first) * slot_w
             cost = self.cost(tt["cost"])
             if highlight and i == self.shop:
@@ -1905,7 +2619,7 @@ class Game:
             surf.blit(spr, (x + slot_w // 2 - 22, PANEL_Y + 2))
             img = app.text(app.f_small, "$%d" % cost, GREEN if self.money >= cost else (230, 110, 110))
             surf.blit(img, img.get_rect(center=(x + slot_w // 2, PANEL_Y + 54)))
-        for side, show in ((-1, first > 0), (1, first + shown < len(TOWER_TYPES))):
+        for side, show in ((-1, first > 0), (1, first + shown < len(SHOP))):
             if show:   # little arrows: more towers this way
                 ax = 5 if side < 0 else SCREEN_W - 5
                 pygame.draw.polygon(surf, YELLOW, [(ax, PANEL_Y + 28), (ax - side * 7, PANEL_Y + 20),
@@ -1917,8 +2631,8 @@ class Game:
         pygame.draw.line(surf, (80, 85, 105), (0, PANEL_Y), (SCREEN_W, PANEL_Y), 2)
         if self.mode == "place":
             self.draw_shop_strip(surf, True)
-            tt = TOWER_TYPES[self.shop]
-            name = tt["name"]
+            tt = SHOP[self.shop]
+            name = tt["name"] + ("  (hero)" if tt.get("hero") else "  (water)" if tt.get("water") else "")
             disc = self.discount_at(self.cx, self.cy)
             if disc:
                 name += "  $%d!" % self.place_cost(tt, self.cx, self.cy)
@@ -1928,12 +2642,14 @@ class Game:
             surf.blit(app.text(app.f_small, tt["desc"], (200, 205, 220)), (10, PANEL_Y + 95))
         else:
             self.draw_shop_strip(surf, False)
-            if self.mode == "menu":
+            if self.mode == "abilities":
+                l1, l2 = "LEFT/RIGHT: pick ability", "A: use it  B: close"
+            elif self.mode == "menu":
                 l1, l2 = "UP/DOWN: choose  A: OK", "L/R: next tower  B: close"
             elif self.active:
-                l1, l2 = "L/R: buy  A: tower  B: menu", "START: pause  SELECT: speed"
+                l1, l2 = "L/R: buy  A: tower  B: menu", "START: pause  SELECT: speed  L+R: powers"
             else:
-                l1, l2 = "L/R: buy  A: tower  B: menu", "START: next round  SELECT: speed"
+                l1, l2 = "L/R: buy  A: tower  B: menu", "START: go  SELECT: speed  L+R: powers"
             surf.blit(app.text(app.f_small, l1, (200, 205, 220)), (10, PANEL_Y + 70))
             surf.blit(app.text(app.f_small, l2, (200, 205, 220)), (10, PANEL_Y + 95))
 
@@ -1941,7 +2657,8 @@ class Game:
         """Upgrade menu for the selected tower, drawn over the map."""
         app = self.app
         t = self.sel
-        h = 70 + 36 * len(self.menu_rows(t))
+        keys = self.menu_rows(t)
+        h = 96 + 34 * len(keys)
         y0 = MAP_Y + MAP_H - h - 4 if t.y < MAP_Y + MAP_H / 2 else MAP_Y + 4
         box = pygame.Rect(6, y0, SCREEN_W - 12, h)
         pygame.draw.rect(surf, (28, 32, 46), box, border_radius=10)
@@ -1950,16 +2667,41 @@ class Game:
         surf.blit(app.text(app.f_norm, title, YELLOW), (18, y0 + 8))
 
         rows = []
-        for p in (0, 1):
+        stats = stat_summary(t.s)   # line under the description
+        if t.hero:
+            if t.hero_level >= HERO_MAX_LEVEL:
+                xp = "MAX level"
+            else:
+                xp = "XP %d/%d" % (t.xp, HERO_XP[t.hero_level])
+            nxt = [lvl for lvl, _ in t.t["abilities"] if lvl > t.hero_level]
+            hint = ("New ability at level %d" % nxt[0]) if nxt else "Levels up by popping balloons"
+            rows.append(("Level %d   %s" % (t.hero_level, xp), (255, 215, 80), hint))
+        for p in range(len(t.t["paths"])):
             state = t.upgrade_state(p)
             if state == "max":
-                rows.append(("Path %s: MAX" % "AB"[p], GRAY, "Fully upgraded"))
+                rows.append(("Path %s: MAX" % "ABC"[p], GRAY, "Fully upgraded"))
             elif state == "locked":
-                rows.append(("Path %s: locked" % "AB"[p], GRAY, "Only one path can reach level 3"))
+                rows.append(("Path %s: locked" % "ABC"[p], GRAY, "Only one path can reach level 3"))
+            elif state == "two":
+                rows.append(("Path %s: closed" % "ABC"[p], GRAY, "Only 2 paths per tower"))
             else:
                 name, _, desc, _ = t.t["paths"][p][t.levels[p]]
                 cost = self.upgrade_cost(t, p)
                 rows.append(("%s  $%d" % (name, cost), GREEN if self.money >= cost else (230, 110, 110), desc))
+                if keys[self.menu] == "upgrade%d" % p:   # show exactly what this upgrade changes
+                    before = Tower(t.t, 0, 0, 0)
+                    before.levels = list(t.levels)
+                    before.recalc()
+                    after = Tower(t.t, 0, 0, 0)
+                    after.levels = list(t.levels)
+                    after.levels[p] += 1
+                    after.recalc()
+                    stats = "> " + stat_changes(before.s, after.s)
+        for aid in t.abilities():
+            name, _, desc = ABILITIES[aid]
+            left = t.ab_cool.get(aid, 0)
+            rows.append(("%s: %s" % (name, "READY (A)" if left <= 0 else "%ds" % math.ceil(left)),
+                         YELLOW if left <= 0 else GRAY, "Ability: " + desc))
         if t.key == "spike":
             rows.append(("Piles pop %d each" % t.s["pierce"], WHITE, "Spikes land on the track in range"))
         elif t.key == "village":
@@ -1981,18 +2723,19 @@ class Game:
         value = int(t.spent * SELL_RATE)
         rows.append(("Sell  +$%d" % value, (255, 200, 120), "Remove tower, get money back"))
 
-        surf.blit(app.text(app.f_small, rows[self.menu][2], (190, 195, 210)), (18, y0 + 38))
+        surf.blit(app.text(app.f_small, rows[self.menu][2], (190, 195, 210)), (18, y0 + 36))
+        stat_col = GREEN if stats.startswith(">") else (150, 200, 255)
+        surf.blit(app.text(app.f_small, stats[:46], stat_col), (18, y0 + 60))
         for i, (label, col, _) in enumerate(rows):
-            ry = y0 + 66 + i * 36
+            ry = y0 + 90 + i * 34
             if i == self.menu:
-                pygame.draw.rect(surf, PANEL_HI, (14, ry - 2, SCREEN_W - 28, 32), border_radius=6)
-                pygame.draw.rect(surf, YELLOW, (14, ry - 2, SCREEN_W - 28, 32), 2, border_radius=6)
+                pygame.draw.rect(surf, PANEL_HI, (14, ry - 2, SCREEN_W - 28, 31), border_radius=6)
+                pygame.draw.rect(surf, YELLOW, (14, ry - 2, SCREEN_W - 28, 31), 2, border_radius=6)
             surf.blit(app.text(app.f_norm, label, col), (24, ry + 3))
-            if i < 2:
+            if i < len(t.t["paths"]):
                 for k in range(3):
                     rect = (SCREEN_W - 70 + k * 14, ry + 9, 10, 10)
-                    pygame.draw.rect(surf, (255, 120, 80) if i == 0 else (90, 170, 255), rect,
-                                     0 if k < t.levels[i] else 2)
+                    pygame.draw.rect(surf, PATH_COLORS[i], rect, 0 if k < t.levels[i] else 2)
 
     def draw_overlay(self, surf):
         app = self.app
@@ -2025,6 +2768,7 @@ class App:
         self.f_med = pygame.font.Font(None, 40)
         self.f_norm = pygame.font.Font(None, 30)
         self.f_small = pygame.font.Font(None, 26)
+        self.f_tiny = pygame.font.Font(None, 20)
         self._text_cache = {}
         self._bg_cache = {}
         self._range_cache = {}
@@ -2033,8 +2777,9 @@ class App:
                                 for n, i in BALLOON_TYPES.items() if not i.get("blimp") for c in (False, True)}
         self.blimp_sprites = {n: make_blimp_sprites(n) for n, i in BALLOON_TYPES.items() if i.get("blimp")}
         self.tower_sprites = {tt["key"]: finish_tower_sprite(make_tower_sprite(tt["key"], self.f_med))
-                              for tt in TOWER_TYPES}
+                              for tt in SHOP}
         self.shadows = {}   # soft shadows, by size
+        self._mini = {}     # small tower pictures
         self.hud_bg = self.gradient(SCREEN_W, HUD_H, (44, 50, 72), (22, 25, 36))
         self.panel_bg = self.gradient(SCREEN_W, PANEL_H, (46, 51, 70), (26, 29, 41))
         self.ghost_sprites = {}   # see-through copies for the "where will it go" preview
@@ -2047,7 +2792,6 @@ class App:
         self.save = self.load_save()
         self.sounds.set_volume(self.save.get("volume", 70) / 100.0)
         self.state = "title"
-        self.title_idx = 4   # "Start game"
         self.map_idx = 0
         self.diff_idx = 1
         self.game = None
@@ -2056,6 +2800,7 @@ class App:
                                 random.choice(["red", "blue", "green", "yellow", "pink"]),
                                 random.uniform(25, 60)] for _ in range(14)]
         self.btn_hold = 0.0
+        self.title_idx = 0 if self.save.get("resume") else self.title_rows().index("start")
 
     # ---------------------------------------------------------- caches
     def text(self, font, s, color):
@@ -2140,6 +2885,11 @@ class App:
             g.fill(tuple(int(top[i] + (bottom[i] - top[i]) * f) for i in range(3)), (0, y, w, 1))
         return g
 
+    def mini_sprite(self, key):
+        if key not in self._mini:
+            self._mini[key] = pygame.transform.smoothscale(self.tower_sprites[key], (30, 30))
+        return self._mini[key]
+
     def shadow(self, w, h):
         key = (w, h)
         if key not in self.shadows:
@@ -2188,6 +2938,21 @@ class App:
             self.save[key] = rnd
             self.write_save()
 
+    def save_resume(self, snap):
+        self.save["resume"] = snap
+        self.write_save()
+
+    def clear_resume(self):
+        if self.save.pop("resume", None) is not None:
+            self.write_save()
+
+    def continue_game(self):
+        snap = self.save["resume"]
+        self.map_idx, self.diff_idx = snap["map"], snap["diff"]
+        self.game = Game(self, self.map_idx, self.diff_idx)
+        self.game.restore(snap)
+        self.state = "game"
+
     def set_auto_start(self, on):
         """Remembered between games (and after turning the handheld off)."""
         self.save["auto_start"] = on
@@ -2200,6 +2965,7 @@ class App:
     def go_title(self):
         self.state = "title"
         self.game = None
+        self.title_idx = 0 if self.save.get("resume") else self.title_rows().index("start")
 
     def change_volume(self, step):
         """Move the sound slider by step (in %), save it, and play a test pop."""
@@ -2241,41 +3007,64 @@ class App:
                 pygame.draw.rect(surf, YELLOW, r.inflate(40, 14), 2, border_radius=10)
             surf.blit(img, r)
 
+    def title_rows(self):
+        rows = ["continue"] if self.save.get("resume") else []
+        return rows + ["map", "mode", "auto", "sound", "start", "help", "buttons", "quit"]
+
     def title_items(self):
-        return ["Map: < %s >" % MAPS[self.map_idx]["name"],
-                "Mode: < %s >" % DIFFICULTIES[self.diff_idx]["name"],
-                "Auto-start: < %s >" % ("ON" if self.save.get("auto_start") else "OFF"),
-                SOUND_ROW, "Start game", "How to play", "Button test", "Quit"]
+        labels = []
+        for row in self.title_rows():
+            if row == "continue":
+                snap = self.save["resume"]
+                labels.append("Continue: %s R%d" % (MAPS[snap["map"]]["name"], snap["round"] + 1))
+            elif row == "map":
+                labels.append("Map: < %s >" % MAPS[self.map_idx]["name"])
+            elif row == "mode":
+                labels.append("Mode: < %s >" % DIFFICULTIES[self.diff_idx]["name"])
+            elif row == "auto":
+                labels.append("Auto-start: < %s >" % ("ON" if self.save.get("auto_start") else "OFF"))
+            elif row == "sound":
+                labels.append(SOUND_ROW)
+            else:
+                labels.append({"start": "Start game", "help": "How to play",
+                               "buttons": "Button test", "quit": "Quit"}[row])
+        return labels
 
     def update_title(self, dt):
         inp = self.inp
-        n = len(self.title_items())
+        rows = self.title_rows()
+        n = len(rows)
+        self.title_idx %= n
         if "UP" in inp.repeat:
             self.title_idx = (self.title_idx - 1) % n
         if "DOWN" in inp.repeat:
             self.title_idx = (self.title_idx + 1) % n
+        row = rows[self.title_idx]
         step = ("RIGHT" in inp.repeat) - ("LEFT" in inp.repeat)
-        if self.title_idx == 0 and step:
+        go = "A" in inp.pressed or "START" in inp.pressed
+        if row == "map" and step:
             self.map_idx = (self.map_idx + step) % len(MAPS)
-        if self.title_idx == 1 and step:
+        elif row == "mode" and step:
             self.diff_idx = (self.diff_idx + step) % len(DIFFICULTIES)
-        if self.title_idx == 2 and (step or "A" in inp.pressed):
+        elif row == "auto" and (step or "A" in inp.pressed):
             self.set_auto_start(not self.save.get("auto_start"))
-        elif self.title_idx == 3:
+        elif row == "sound":
             if step:
                 self.change_volume(10 * step)
             elif "A" in inp.pressed:   # A on the slider: mute / unmute
                 self.change_volume(-100 if self.save.get("volume", 70) else 70)
-        elif "A" in inp.pressed or "START" in inp.pressed:
-            if self.title_idx in (0, 1, 2, 4):
+        elif go:
+            if row == "continue":
+                self.continue_game()
+            elif row in ("map", "mode", "start"):
                 self.game = Game(self, self.map_idx, self.diff_idx)
                 self.state = "game"
-            elif self.title_idx == 5:
+            elif row == "help":
                 self.state = "help"
-            elif self.title_idx == 6:
+            elif row == "buttons":
                 self.state = "buttons"
                 self.btn_hold = 0.0
-            elif self.title_idx == 7:
+            elif row == "quit":
                 self.running = False
         for b in self.title_balloons:
             b[1] -= b[3] * dt
@@ -2302,35 +3091,38 @@ class App:
         info = "%s map  -  Best: round %d" % (mp["level"], self.best(self.map_idx, self.diff_idx))
         img = self.text(self.f_small, info, WHITE)
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 276)))
-        self.draw_menu_list(surf, self.title_items(), self.title_idx, 316, 44)
+        self.draw_menu_list(surf, self.title_items(), self.title_idx, 300 if self.save.get("resume") else 316,
+                            38 if self.save.get("resume") else 42)
         img = self.text(self.f_small, VERSION, (190, 210, 240))
         surf.blit(img, (SCREEN_W - img.get_width() - 6, 4))
 
     HELP = [
         ("GOAL", YELLOW),
         ("Pop balloons before they reach the end.", WHITE),
-        ("Each balloon that escapes costs lives.", WHITE),
         ("", WHITE),
         ("CONTROLS", YELLOW),
         ("D-pad: move cursor", WHITE),
-        ("L / R: pick a tower to build", WHITE),
+        ("L / R: pick a tower or hero to build", WHITE),
         ("A: build, or open a tower's menu", WHITE),
-        ("B: cancel / close", WHITE),
+        ("B: cancel / close / game menu", WHITE),
         ("START: next round / pause", WHITE),
-        ("SELECT: fast forward", WHITE),
+        ("SELECT: speed 1x / 2x / 3x", WHITE),
+        ("L + R together: use abilities", WHITE),
         ("", WHITE),
         ("TIPS", YELLOW),
-        ("Lead balloons need bombs, fire or magic.", WHITE),
-        ("Black ones ignore bombs.", WHITE),
-        ("Ninjas see camo. Some upgrades do too.", WHITE),
-        ("Villages boost towers in their circle.", WHITE),
-        ("Only one upgrade path can reach 3.", WHITE),
+        ("Middle path level 3 = an ability.", WHITE),
+        ("Only 2 paths per tower; one can reach 3.", WHITE),
+        ("One hero per game; it levels up to 20.", WHITE),
+        ("Ships, subs and sharks go on water.", WHITE),
+        ("Lead: bombs, fire or magic. Purple: no magic.", WHITE),
+        ("Regrow balloons grow back: finish them!", WHITE),
+        ("The game saves after every round.", WHITE),
     ]
 
     def draw_help(self, surf):
         surf.fill(DARK)
         for i, (line, col) in enumerate(self.HELP):
-            surf.blit(self.text(self.f_small, line, col), (24, 18 + i * 31))
+            surf.blit(self.text(self.f_small, line, col), (20, 14 + i * 28))
         img = self.text(self.f_small, "Press A or B to go back", GRAY)
         surf.blit(img, img.get_rect(center=(SCREEN_W // 2, SCREEN_H - 20)))
 
