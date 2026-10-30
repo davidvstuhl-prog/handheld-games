@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v5.1 (mouse support)"
+VERSION = "v5.2"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -190,8 +190,8 @@ ACHIEVEMENTS = [
 ACH_BY_ID = {a[0]: a for a in ACHIEVEMENTS}
 
 # Sandbox tools: balloon kinds you can send, and how many at once.
-SANDBOX_FLAGS = [("Normal", ""), ("Camo", "c"), ("Healing", "r"), ("Armored", "f"),
-                 ("Camo + Healing", "cr"), ("Camo + Armored", "cf")]
+SANDBOX_FLAGS = [("Normal", ""), ("Invisible", "c"), ("Healing", "r"), ("Armored", "f"),
+                 ("Invis + Healing", "cr"), ("Invis + Armored", "cf")]
 SANDBOX_AMOUNTS = [1, 5, 10, 25, 50]
 
 # Regrow balloons grow back one layer at a time along this chain.
@@ -228,7 +228,7 @@ TOWER_TYPES = [
               ("Spike Ball", 1100, "Rolls a huge spiked ball, bounces once",
                {"spikeball": ("=", True), "count": ("=", 1), "rate": ("*", 1.5)})],
              [("Far Sight", 75, "+30 range", {"range": ("+", 30)}),
-              ("Hawk Lens", 135, "Can see camo balloons",
+              ("Hawk Lens", 135, "Can see invisible balloons",
                {"camo": ("=", True), "range": ("+", 15)}),
               ("Quick Crank", 425, "Throws twice as fast", {"rate": ("*", 0.5)})],
          ]),
@@ -270,7 +270,7 @@ TOWER_TYPES = [
               ("Blimp Buster", 1100, "+2 damage, 3x vs blimps",
                {"dmg": ("+", 2), "blimp_mult": ("=", 3)})],
              [("Long Fuse", 200, "+25 range", {"range": ("+", 25)}),
-              ("Radar Reload", 350, "25% faster, sees camo",
+              ("Radar Reload", 350, "25% faster, sees invisible",
                {"rate": ("*", 0.75), "camo": ("=", True)}),
               ("Scatter Shells", 900, "Blasts throw 6 mini bombs", {"cluster": ("=", 6)})],
          ]),
@@ -300,11 +300,11 @@ TOWER_TYPES = [
                {"range": ("+", 40), "freeze": ("+", 0.4)})],
              [("Wide Chill", 120, "+20 range", {"range": ("+", 20)}),
               ("Lingering Chill", 250, "Slows balloons after thaw", {"slow_after": ("=", 3.0)}),
-              ("Snap Frost", 500, "Freezes white+striped, sees camo",
+              ("Snap Frost", 500, "Freezes white+striped, sees invis",
                {"freeze_white": ("=", True), "camo": ("=", True)})],
          ]),
     dict(key="ninja", name="Shadow Dojo", cost=400,
-         desc="Fast stars. Sees camo",
+         desc="Fast stars. Sees invisible",
          base=dict(range=125, rate=0.55, dmg=1, pierce=2, speed=620, dtype="sharp",
                    camo=True, count=1, spread=0.0, homing=False, stun=0),
          paths=[
@@ -326,7 +326,7 @@ TOWER_TYPES = [
               ("Big Bore", 1000, "7 damage", {"dmg": ("=", 7)}),
               ("True Aim", 2500, "18 damage, 4x vs blimps",
                {"dmg": ("=", 18), "blimp_mult": ("=", 4)})],
-             [("Dark Lens", 300, "Can see camo balloons", {"camo": ("=", True)}),
+             [("Dark Lens", 300, "Can see invisible balloons", {"camo": ("=", True)}),
               ("Quick Bolt", 400, "Shoots 40% faster", {"rate": ("*", 0.6)}),
               ("Auto Loader", 2800, "Shoots 3x faster", {"rate": ("*", 0.33)})],
          ]),
@@ -340,7 +340,7 @@ TOWER_TYPES = [
                {"rate": ("*", 0.6), "pierce": ("+", 2)}),
               ("Chain Spark", 1280, "Lightning jumps to 8 balloons", {"chain": ("=", 8)})],
              [("Seeking Runes", 200, "Magic bolts chase balloons", {"homing": ("=", True)}),
-              ("True Sight", 240, "Sees camo, +20 range",
+              ("True Sight", 240, "Sees invisible, +20 range",
                {"camo": ("=", True), "range": ("+", 20)}),
               ("Fire Wyrm", 1040, "Adds a flamethrower", {"breath": ("=", True)})],
          ]),
@@ -360,7 +360,7 @@ TOWER_TYPES = [
          desc="Boosts towers in its circle",
          base=dict(range=115, boost=0.1, radar=False, drums=0, rune=False, discount=0, income=0),
          paths=[
-             [("Lookout Post", 400, "Towers in circle see camo", {"radar": ("=", True)}),
+             [("Lookout Post", 400, "Towers in circle see invisible", {"radar": ("=", True)}),
               ("Drum Circle", 900, "Towers in circle 15% faster", {"drums": ("=", 0.15)}),
               ("Ancient Rune", 2200, "Towers in circle pop iron+black", {"rune": ("=", True)})],
              [("Watchtower", 250, "Bigger circle, +20% range",
@@ -379,7 +379,7 @@ TOWER_TYPES = [
                {"dmg": ("+", 1), "dtype": ("=", "magic")}),
               ("Solar Flare", 11000, "3 beams, +2 damage, +3 pierce",
                {"count": ("=", 3), "spread": ("=", 0.15), "dmg": ("+", 2), "pierce": ("+", 3)})],
-             [("Night Lens", 600, "Sees camo balloons", {"camo": ("=", True)}),
+             [("Night Lens", 600, "Sees invisible balloons", {"camo": ("=", True)}),
               ("Twin Blasters", 3000, "Shoots 2 at once",
                {"count": ("=", 2), "spread": ("=", 0.12)}),
               ("Blimp Wrecker", 6000, "4x damage to blimps", {"blimp_mult": ("=", 4)})],
@@ -406,7 +406,7 @@ TOWER_TYPES += [
              [("Chain Shot", 220, "Cannonballs pop 2 more", {"pierce": ("+", 2)}),
               ("Double Deck", 450, "4 cannonballs per shot", {"count": ("=", 4), "spread": ("=", 0.12)}),
               ("Iron Balls", 1300, "+2 damage, pops iron", {"dmg": ("+", 2), "dtype": ("=", "normal")})],
-             [("Lookout Mast", 200, "+25 range, sees camo", {"range": ("+", 25), "camo": ("=", True)}),
+             [("Lookout Mast", 200, "+25 range, sees invisible", {"range": ("+", 25), "camo": ("=", True)}),
               ("Cargo Hold", 500, "+$60 every round", {"income": ("=", 60)}),
               ("Treasure Fleet", 1500, "+$260 every round", {"income": ("=", 260)})],
          ]),
@@ -419,7 +419,7 @@ TOWER_TYPES += [
               ("Homing Torpedo", 450, "Torpedoes chase balloons", {"homing": ("=", True)}),
               ("Torpedo Spread", 1400, "3 torpedoes, +2 pierce",
                {"count": ("=", 3), "spread": ("=", 0.2), "pierce": ("+", 2)})],
-             [("Sonar", 250, "Sees camo balloons", {"camo": ("=", True)}),
+             [("Sonar", 250, "Sees invisible balloons", {"camo": ("=", True)}),
               ("Periscope", 300, "+30 range", {"range": ("+", 30)}),
               ("Blimp Hunter", 1500, "4x damage to blimps", {"blimp_mult": ("=", 4)})],
          ]),
@@ -431,7 +431,7 @@ TOWER_TYPES += [
               ("Mega Bite", 500, "Bites 3 more balloons", {"pierce": ("+", 3)}),
               ("Great Bite", 1500, "+3 damage, 3x vs blimps", {"dmg": ("+", 3), "blimp_mult": ("=", 3)})],
              [("Wide Circle", 200, "+20 range", {"range": ("+", 20)}),
-              ("Smell Blood", 350, "Sees camo balloons", {"camo": ("=", True)}),
+              ("Smell Blood", 350, "Sees invisible balloons", {"camo": ("=", True)}),
               ("Riptide", 1100, "Bites drag balloons back", {"knock": ("=", 30)})],
          ]),
 ]
@@ -702,7 +702,7 @@ HERO_TYPES = [
          hero=True, paths=[], abilities=[(5, "twister"), (14, "hurricane")]),
     dict(key="gear", name="Gear Gunner", cost=500, desc="Rapid-fire bolt gun",
          hero=True, paths=[], abilities=[(5, "overclock"), (14, "mega_mortar")]),
-    dict(key="cipher", name="Cipher", cost=600, desc="Hacker: cash, strips camo",
+    dict(key="cipher", name="Cipher", cost=600, desc="Hacker: cash, strips invisibility",
          hero=True, paths=[], abilities=[(4, "crypto_boost"), (12, "glitch_wave")]),
     dict(key="nova", name="Nova", cost=650, desc="Mind power lifts balloons",
          hero=True, paths=[], abilities=[(5, "mind_blast"), (13, "gravity_well")]),
@@ -765,7 +765,7 @@ ABILITIES = {
     "overclock":      ("Overclock", 40, "Fires 3x faster for 8s"),
     "mega_mortar":    ("Mega Mortar", 55, "Giant blast on the strongest"),
     "crypto_boost":   ("Crypto Boost", 50, "Instant cash"),
-    "glitch_wave":    ("Glitch Wave", 55, "Strips a layer + camo off all"),
+    "glitch_wave":    ("Glitch Wave", 55, "Strips a layer + invisibility off all"),
     "mind_blast":     ("Mind Blast", 40, "Shockwave: 3 damage + stun"),
     "gravity_well":   ("Gravity Well", 60, "Lifts 30 balloons into the air"),
 }
@@ -778,8 +778,8 @@ STAT_LABELS = [("dmg", "Damage"), ("pierce", "Pierce"), ("count", "Shots"), ("ra
                ("ball_pierce", "Ball pops"), ("ball_bounces", "Bounces"), ("breath_dmg", "Fire dmg"),
                ("drums", "Speed boost"), ("pile_cap", "Max piles"), ("cluster", "Mini bombs"),
                ("splash", "Splash"), ("acid", "Acid every")]
-FLAG_LABELS = {"camo": "sees camo", "homing": "homing", "spikeball": "Spike Ball", "breath": "flamethrower",
-               "freeze_white": "freezes white", "radar": "camo radar", "rune": "iron popping",
+FLAG_LABELS = {"camo": "sees invisible", "homing": "homing", "spikeball": "Spike Ball", "breath": "flamethrower",
+               "freeze_white": "freezes white", "radar": "invisible radar", "rune": "iron popping",
                "glue_blimp": "goos blimps", "mines": "spike mines", "ability": "new ability", "acid": "acid"}
 
 
@@ -1329,13 +1329,13 @@ def make_balloon_sprite(name, camo):
         pygame.draw.circle(s, (215, 150, 80), (c, c), r - 4, 3)
     if name == "lead":
         pygame.draw.circle(s, (85, 90, 100), (c, c), r, 3)
-    if camo:
-        spots = [(-0.4, 0.1, 0.32), (0.35, -0.3, 0.28), (0.2, 0.45, 0.25), (-0.1, -0.5, 0.2)]
-        for i, (sx, sy, sr) in enumerate(spots):
-            pygame.draw.circle(s, (70, 100, 40) if i % 2 else (110, 130, 60),
-                               (int(c + sx * r), int(c + sy * r)), max(2, int(sr * r)))
     shade_ball(s, c, c, r, r)
-    pygame.draw.circle(s, (40, 70, 30) if camo else dark, (c, c), r, 2)
+    pygame.draw.circle(s, dark, (c, c), r, 2)
+    if camo:    # invisible: see-through, with a shimmering dashed outline
+        s.fill((255, 255, 255, 95), special_flags=pygame.BLEND_RGBA_MULT)
+        for i in range(10):
+            a = i * math.pi / 5
+            pygame.draw.arc(s, (225, 240, 255), (c - r, c - r, r * 2, r * 2), a, a + math.pi / 9, 2)
     return s, c, c
 
 
@@ -1351,7 +1351,7 @@ def make_blimp_sprites(name):
     pygame.draw.polygon(s, dark, [(0, h + 8), (22, cy + 4), (8, cy + 4)])
     body = pygame.Rect(6, 5, w, h)
     pygame.draw.ellipse(s, col, body)
-    if name == "phantom":      # sleek, with camo spots and a red stripe
+    if name == "phantom":      # sleek, with dark spots and a red stripe
         for fx, fy, fr in ((0.3, 0.4, 0.14), (0.55, 0.65, 0.12), (0.75, 0.35, 0.1), (0.45, 0.25, 0.09)):
             pygame.draw.circle(s, (70, 100, 60), (6 + int(w * fx), 5 + int(h * fy)), int(h * fr * 1.4))
         pygame.draw.line(s, (220, 50, 50), (6 + int(w * 0.15), cy), (6 + int(w * 0.9), cy), 3)

@@ -84,7 +84,7 @@ the main menu shows them all. Sandbox games don't count.
   Beat round 150 (with the Overlord) to become **Champion**, then freeplay continues.
 - **Easy** starts with $850 (instead of $650), slower balloons and cheaper towers.
 - **Sandbox** (pick it as the difficulty) is for testing: endless money and lives, and
-  **Sandbox tools** in the B menu let you send any balloon (camo / regrow / fortified, 1-50
+  **Sandbox tools** in the B menu let you send any balloon (invisible / healing / armored, 1-50
   at a time), jump to any round 1-50, pop everything and recharge abilities. Sandbox
   games never overwrite your saved game or best rounds.
 
@@ -97,7 +97,7 @@ carry on where you left off (a game over clears the save).
 
 Every tower has **three upgrade paths with 5 tiers each** (that's 15 upgrades per tower):
 
-- **Top (orange)** and **bottom (blue)**: stronger attacks, range, camo and so on.
+- **Top (orange)** and **bottom (blue)**: stronger attacks, range, seeing invisible balloons and so on.
 - **Middle (green)**: **tier 4 unlocks an ability** you fire yourself, and **tier 5
   powers that ability up** (more tacks, longer freezes, bigger paydays...).
 - **One path can go all the way to tier 5**, and a second path can go up to tier 2.
@@ -151,15 +151,15 @@ At middle **tier 5** every ability gets much stronger.
 | Mortar | $500 | Explosions pop groups and iron (not black) |
 | Goo Tank | $200 | Fast-firing glue slows balloons; acid glue pops them |
 | Frost Spire | $350 | Freezes balloons around it |
-| Shadow Dojo | $400 | Fast throwing stars, sees camo |
+| Shadow Dojo | $400 | Fast throwing stars, sees invisible |
 | Marksman Nest | $350 | Hits anything anywhere on the map |
 | Arcane Tower | $320 | Magic; Chain Spark and Fire Wyrm upgrades |
 | Spike Press | $650 | Drops spike piles on the track (only during rounds) |
-| Camp | $900 | Boosts towers in its circle: range, camo, speed, discounts, money |
+| Camp | $900 | Boosts towers in its circle: range, invisible vision, speed, discounts, money |
 | Star Core | $2200 | A storm of darts |
 | Coin Mine | $600 | Earns money every round |
 | 🏴‍☠️ Galleon | $450 | **Water only.** Fires 2 cannonballs at a time |
-| 🚢 Torpedo Sub | $350 | **Water only.** Torpedoes; Sonar sees camo |
+| 🚢 Torpedo Sub | $350 | **Water only.** Torpedoes; Sonar sees invisible |
 | 🦈 Reef Shark | $400 | **Water only.** Bites nearby balloons hard |
 
 All towers got a power boost from playtesting: they attack 15% faster, and darts,
@@ -180,7 +180,7 @@ as rounds go by. They unlock two abilities as they level up.
 | ⚔️ Spark Knight | $550 | Lightning sword slashes a whole group | Thunder Strike (lv 5), Storm Blade (lv 14) |
 | 🌪️ Wind Witch | $500 | Gusts pop balloons and push them back | Twister (lv 5), Hurricane (lv 14) |
 | ⚙️ Gear Gunner | $500 | Rapid-fire bolt gun | Overclock (lv 5), Mega Mortar (lv 14) |
-| 💻 Cipher | $600 | Hacker: earns cash every round, zaps strip camo | Crypto Boost (lv 4), Glitch Wave (lv 12) |
+| 💻 Cipher | $600 | Hacker: earns cash every round, zaps strip invisibility | Crypto Boost (lv 4), Glitch Wave (lv 12) |
 | 🔮 Nova | $650 | Mind power lifts balloons into the air, where they can't move and take damage | Mind Blast (lv 5), Gravity Well (lv 13) |
 
 ### Maps
@@ -201,14 +201,14 @@ as rounds go by. They unlock two abilities as they level up.
 - **Iron** (gray): darts and tacks bounce off. Use bombs, fire, magic, or Steel Core snipers.
 - **Black**: ignores explosions. **White**: can't be frozen. **Striped**: both.
 - **Violet**: fast, and immune to **magic and fire** (Arcane Tower, Flame Halo, Plasma Heart).
-- **Camo** (green spots): only towers with camo vision can target them
+- **Invisible** (see-through, with a dashed outline): only towers that can see invisible balloons can target them
   (Shadow Dojo, Hawk Lens, Dark Lens, Radar Reload, True Sight, Snap Frost,
   Night Lens, Sonar, Smell Blood, Lookout Mast, heroes, or a Camp with Lookout Post).
 - **Healing** (green **+** badge): grows its layers back every 3 seconds. Finish them fast!
 - **Armored** (metal band): armored iron, clay balloons and blimps that take twice the hits.
 - **Clay**: takes 10 hits.
 - **Blimp** (round 25) and **Titan** (round 30): giant bosses with health bars.
-- **Phantom** (from round 45): a fast, dark blimp that is **always camo** and immune to
+- **Phantom** (from round 45): a fast, dark blimp that is **always invisible** and immune to
   darts/tacks **and** explosions. Use magic, fire, normal-damage upgrades or bites.
 - **Colossus** (from round 50): a huge armored blimp (2,000 health) that drops 4 Titans.
 - **Overlord** (rounds 100, 125 and 150): the final boss, 15,000 health. It **can't be
