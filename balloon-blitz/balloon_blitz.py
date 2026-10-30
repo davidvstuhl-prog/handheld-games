@@ -19,7 +19,7 @@ import pygame
 # =====================================================================
 # Settings
 # =====================================================================
-VERSION = "v3.0 (16 towers, 5 heroes, 8 maps)"
+VERSION = "v3.1 (16 towers, 5 heroes, 8 maps)"
 SCREEN_W, SCREEN_H = 480, 640
 HUD_H = 40                      # top bar (lives, money, round)
 MAP_Y, MAP_H = HUD_H, 480       # the play field is a 480x480 square
@@ -1050,156 +1050,297 @@ def draw_stone_base(s, c, r):
     shade_ball(s, c, c, r + 3, r + 3, 0.6)
 
 
+def lit(size, draw, cx, cy, rx, ry, strength=1.0):
+    """Draw one part on its own layer and light it so it looks round/3D."""
+    part = pygame.Surface(size, pygame.SRCALPHA)
+    draw(part)
+    shade_ball(part, cx, cy, rx, ry, strength)
+    return part
+
+
+def body_outline(w, profile, top=2):
+    """Points around a long body pointing up: profile = [(y, half width), ...]."""
+    c = w / 2
+    left = [(c - hw, y) for y, hw in profile]
+    right = [(c + hw, y) for y, hw in reversed(profile)]
+    return [(c, top)] + left + right
+
+
 def make_tower_sprite(key, font):
-    s = pygame.Surface((44, 44), pygame.SRCALPHA)
+    """Top-down 3D-looking tower art (water towers face up and get rotated in game)."""
+    if key in WATER_KEYS:
+        return make_water_sprite(key)
+    size = (44, 44)
+    s = pygame.Surface(size, pygame.SRCALPHA)
     c = 22
     r = TOWER_R
-    if key in ("pirate", "sub", "shark"):   # water towers: ripples instead of a stone base
-        pygame.draw.circle(s, (120, 190, 240), (c, c), r + 3, 2)
-        pygame.draw.circle(s, (170, 220, 250), (c, c), r - 1, 1)
-    else:
-        draw_stone_base(s, c, r)
-    if key == "pirate":     # wooden hull, white sail, little flag
-        pygame.draw.ellipse(s, (120, 75, 35), (c - 9, c - 17, 18, 34))
-        pygame.draw.ellipse(s, (70, 40, 15), (c - 9, c - 17, 18, 34), 2)
-        pygame.draw.line(s, (60, 35, 15), (c, c - 13), (c, c + 12), 2)
-        pygame.draw.polygon(s, (245, 240, 225), [(c - 12, c - 6), (c + 12, c - 6), (c + 9, c + 5), (c - 9, c + 5)])
-        pygame.draw.polygon(s, (30, 30, 30), [(c, c - 16), (c + 7, c - 14), (c, c - 12)])
-    elif key == "sub":      # yellow hull, tower and periscope
-        pygame.draw.ellipse(s, (235, 200, 60), (c - 16, c - 7, 32, 14))
-        pygame.draw.ellipse(s, (130, 100, 20), (c - 16, c - 7, 32, 14), 2)
-        pygame.draw.rect(s, (205, 170, 50), (c - 4, c - 12, 9, 8), border_radius=2)
-        pygame.draw.line(s, (90, 90, 100), (c + 2, c - 12), (c + 2, c - 18), 2)
-        pygame.draw.line(s, (90, 90, 100), (c + 2, c - 18), (c + 6, c - 18), 2)
-        for wx in (c - 9, c - 2, c + 5):
-            pygame.draw.circle(s, (120, 200, 240), (wx + 3, c), 2)
-    elif key == "shark":    # a fin cutting through the water
-        pygame.draw.ellipse(s, (60, 120, 180), (c - 14, c + 2, 28, 8))
-        pygame.draw.polygon(s, (110, 120, 135), [(c - 8, c + 5), (c + 9, c + 5), (c + 2, c - 14)])
-        pygame.draw.polygon(s, (60, 65, 80), [(c - 8, c + 5), (c + 9, c + 5), (c + 2, c - 14)], 2)
-        pygame.draw.line(s, (200, 230, 250), (c - 14, c + 7), (c - 4, c + 7), 2)
-    if key == "dart":
-        pygame.draw.circle(s, (125, 82, 45), (c, c), r)
-        pygame.draw.circle(s, (195, 150, 100), (c, c), r - 7)
-        pygame.draw.circle(s, (60, 40, 20), (c, c), r, 2)
-    elif key == "tack":
-        pts = [(c + r * math.cos(i * math.pi / 4 + math.pi / 8), c + r * math.sin(i * math.pi / 4 + math.pi / 8))
-               for i in range(8)]
-        pygame.draw.polygon(s, (155, 155, 168), pts)
-        pygame.draw.polygon(s, (70, 70, 80), pts, 2)
-        pygame.draw.circle(s, (80, 80, 92), (c, c), 7)
+    draw_stone_base(s, c, r)
+    if key == "dart":   # wooden platform with a bundle of darts
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (150, 100, 55), (c, c), 14), c, c, 14, 14), (0, 0))
+        for x in range(c - 10, c + 11, 5):
+            pygame.draw.line(s, (110, 70, 35), (x, c - 12), (x, c + 12), 1)
+        pygame.draw.circle(s, (80, 50, 25), (c, c), 14, 2)
+        for i, (dx, dy) in enumerate(((-9, 5), (-7, 8), (-11, 8))):
+            pygame.draw.line(s, (90, 60, 30), (c + dx, c + dy), (c + dx + 3, c + dy - 7), 2)
+            pygame.draw.circle(s, (220, 60, 60), (c + dx, c + dy), 2)
+    elif key == "tack":   # spiked steel dome
         for i in range(8):
-            a = i * math.pi / 4
-            pygame.draw.circle(s, (230, 230, 240), (int(c + (r - 4) * math.cos(a)), int(c + (r - 4) * math.sin(a))), 2)
-    elif key == "bomb":
-        pygame.draw.circle(s, (62, 62, 70), (c, c), r)
-        pygame.draw.circle(s, (105, 105, 118), (c, c), r - 7)
-        pygame.draw.circle(s, (20, 20, 24), (c, c), r, 2)
-    elif key == "frost":
-        pygame.draw.circle(s, (150, 210, 245), (c, c), r)
-        pygame.draw.circle(s, (70, 140, 200), (c, c), r, 2)
-        for i in range(3):
-            a = i * math.pi / 3
-            dx, dy = math.cos(a) * (r - 4), math.sin(a) * (r - 4)
-            pygame.draw.line(s, WHITE, (c - dx, c - dy), (c + dx, c + dy), 3)
-    elif key == "sniper":
-        pygame.draw.circle(s, (92, 112, 60), (c, c), r)
-        pygame.draw.circle(s, (135, 155, 85), (c, c), r - 8)
-        pygame.draw.circle(s, (40, 55, 25), (c, c), r, 2)
-    elif key == "boom":
-        pygame.draw.circle(s, (230, 150, 60), (c, c), r)
-        pygame.draw.circle(s, (130, 75, 25), (c, c), r, 2)
-        pygame.draw.lines(s, (90, 50, 20), False, [(c - 9, c - 7), (c + 1, c + 6), (c + 10, c - 6)], 5)
-    elif key == "glue":
-        pygame.draw.circle(s, (120, 175, 70), (c, c), r)
-        pygame.draw.circle(s, (60, 100, 30), (c, c), r, 2)
-        pygame.draw.circle(s, (200, 235, 90), (c - 3, c + 2), 7)
-        pygame.draw.circle(s, (200, 235, 90), (c + 5, c + 6), 4)
-    elif key == "ninja":
-        pygame.draw.circle(s, (45, 45, 60), (c, c), r)
-        pygame.draw.rect(s, (200, 40, 40), (c - r + 3, c - 5, 2 * r - 6, 7))
-        star = []
-        for i in range(8):
-            rad = 9 if i % 2 == 0 else 3
-            a = i * math.pi / 4
-            star.append((c + rad * math.cos(a), c + 7 + rad * math.sin(a) * 0.6))
-        pygame.draw.polygon(s, (210, 210, 220), star)
-        pygame.draw.circle(s, (20, 20, 28), (c, c), r, 2)
-    elif key == "spike":
-        rect = pygame.Rect(c - 13, c - 13, 26, 26)
-        for i in range(4):   # spikes poking out on every side
-            a = i * math.pi / 2
+            a = i * math.pi / 4 + math.pi / 8
             tip = (c + 19 * math.cos(a), c + 19 * math.sin(a))
-            side = (math.cos(a + math.pi / 2) * 6, math.sin(a + math.pi / 2) * 6)
-            base = (c + 12 * math.cos(a), c + 12 * math.sin(a))
-            pygame.draw.polygon(s, (190, 190, 200), [tip, (base[0] + side[0], base[1] + side[1]),
-                                                     (base[0] - side[0], base[1] - side[1])])
-        pygame.draw.rect(s, (110, 110, 120), rect, border_radius=4)
-        pygame.draw.rect(s, (60, 60, 70), rect, 2, border_radius=4)
-        pygame.draw.circle(s, (230, 160, 50), (c, c), 4)
-    elif key == "village":
-        pygame.draw.circle(s, (120, 170, 90), (c, c), r)
-        pygame.draw.circle(s, (60, 100, 40), (c, c), r, 2)
-        pygame.draw.rect(s, (175, 120, 70), (c - 9, c - 2, 18, 12))
-        pygame.draw.polygon(s, (200, 60, 50), [(c - 13, c - 1), (c + 13, c - 1), (c, c - 13)])
-        pygame.draw.rect(s, (80, 50, 25), (c - 3, c + 3, 6, 7))
-    elif key == "super":
-        pygame.draw.circle(s, (50, 90, 200), (c, c), r)
-        pygame.draw.circle(s, (20, 40, 110), (c, c), r, 2)
-        star = []
-        for i in range(10):
-            rad = 11 if i % 2 == 0 else 5
-            a = i * math.pi / 5 - math.pi / 2
-            star.append((c + rad * math.cos(a), c + rad * math.sin(a)))
-        pygame.draw.polygon(s, (255, 215, 60), star)
-    elif key == "knight":   # silver helmet, visor slit, lightning plume
-        pygame.draw.circle(s, (175, 180, 195), (c, c), r - 1)
-        pygame.draw.circle(s, (90, 95, 110), (c, c), r - 1, 2)
-        pygame.draw.rect(s, (40, 45, 60), (c - 9, c - 1, 18, 4), border_radius=2)
-        pygame.draw.polygon(s, (255, 215, 60), [(c - 1, c - 18), (c + 5, c - 10), (c + 1, c - 10),
-                                                (c + 4, c - 3), (c - 4, c - 11), (c, c - 11)])
-    elif key == "witch":    # teal robe, wide pointy hat, wind swirl
-        pygame.draw.circle(s, (60, 170, 160), (c, c), r - 1)
-        pygame.draw.circle(s, (25, 90, 85), (c, c), r - 1, 2)
-        pygame.draw.ellipse(s, (30, 70, 80), (c - 15, c - 6, 30, 8))
-        pygame.draw.polygon(s, (30, 70, 80), [(c - 7, c - 3), (c + 7, c - 3), (c + 4, c - 18)])
-        pygame.draw.arc(s, WHITE, (c - 9, c + 1, 18, 12), math.radians(200), math.radians(360), 2)
-    elif key == "gear":     # orange, gear teeth, two goggles
-        for i in range(10):
-            a = i * math.pi / 5
-            pygame.draw.circle(s, (120, 120, 130), (int(c + (r - 1) * math.cos(a)), int(c + (r - 1) * math.sin(a))), 3)
-        pygame.draw.circle(s, (230, 140, 50), (c, c), r - 3)
-        for gx in (c - 5, c + 5):
-            pygame.draw.circle(s, (60, 60, 70), (gx, c - 2), 5)
-            pygame.draw.circle(s, (150, 220, 255), (gx, c - 2), 3)
-    elif key == "cipher":   # dark hoodie colors with a little laptop
-        pygame.draw.circle(s, (40, 50, 80), (c, c), r - 1)
-        pygame.draw.circle(s, (20, 25, 45), (c, c), r - 1, 2)
-        pygame.draw.rect(s, (150, 155, 170), (c - 10, c - 8, 20, 13), border_radius=2)
-        pygame.draw.rect(s, (20, 60, 30), (c - 8, c - 6, 16, 9))
-        for i in range(3):
-            pygame.draw.line(s, (90, 255, 120), (c - 6, c - 4 + i * 3), (c - 6 + 4 + i * 3, c - 4 + i * 3), 1)
-        pygame.draw.rect(s, (120, 125, 140), (c - 12, c + 5, 24, 3), border_radius=1)
-    elif key == "nova":     # violet with a glowing mind orb and orbiting sparks
-        pygame.draw.circle(s, (90, 40, 140), (c, c), r - 1)
-        pygame.draw.circle(s, (50, 20, 80), (c, c), r - 1, 2)
-        pygame.draw.circle(s, (220, 150, 255), (c, c), 7)
-        pygame.draw.circle(s, (255, 235, 255), (c, c), 4)
+            l = (c + 12 * math.cos(a - 0.3), c + 12 * math.sin(a - 0.3))
+            rr = (c + 12 * math.cos(a + 0.3), c + 12 * math.sin(a + 0.3))
+            pygame.draw.polygon(s, (205, 210, 220), [tip, l, rr])
+            pygame.draw.polygon(s, (110, 115, 130), [tip, l, rr], 1)
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (165, 170, 185), (c, c), 12), c, c, 12, 12, 1.3), (0, 0))
+        pygame.draw.circle(s, (90, 95, 110), (c, c), 12, 1)
+        pygame.draw.circle(s, (70, 75, 90), (c, c), 3)
+    elif key == "boom":   # wooden platform with two crossed boomerangs
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (185, 130, 70), (c, c), 14), c, c, 14, 14), (0, 0))
+        pygame.draw.circle(s, (110, 70, 30), (c, c), 14, 2)
+        for flip in (1, -1):
+            pts = [(c - 10 * flip, c - 8), (c, c + 2), (c + 10 * flip, c - 8)]
+            pygame.draw.lines(s, (120, 60, 20), False, [(x + 1, y + 1) for x, y in pts], 6)
+            pygame.draw.lines(s, (245, 155, 55), False, pts, 5)
+            pygame.draw.lines(s, (255, 210, 130), False, [(x, y - 1) for x, y in pts], 1)
+    elif key == "bomb":   # heavy iron mortar with rivets
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (75, 75, 88), (c, c), 15), c, c, 15, 15, 1.2), (0, 0))
+        for i in range(8):
+            a = i * math.pi / 4
+            pygame.draw.circle(s, (150, 150, 165), (int(c + 12 * math.cos(a)), int(c + 12 * math.sin(a))), 1)
+        pygame.draw.circle(s, (25, 25, 30), (c, c), 15, 2)
+    elif key == "glue":   # green glue tank with a hazard ring
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (110, 185, 70), (c, c), 14), c, c, 14, 14, 1.2), (0, 0))
+        for i in range(12):
+            a1, a2 = i * math.pi / 6, i * math.pi / 6 + math.pi / 6
+            pygame.draw.arc(s, (240, 210, 40) if i % 2 else (30, 30, 30), (c - 15, c - 15, 30, 30), a1, a2, 3)
+        pygame.draw.circle(s, (190, 240, 110), (c - 4, c + 5), 3)
+        pygame.draw.circle(s, (190, 240, 110), (c + 5, c + 7), 2)
+    elif key == "frost":   # cluster of ice crystals
+        for i in range(6):
+            a = i * math.pi / 3 + 0.3
+            tip = (c + 16 * math.cos(a), c + 16 * math.sin(a))
+            l = (c + 6 * math.cos(a - 0.5), c + 6 * math.sin(a - 0.5))
+            rr = (c + 6 * math.cos(a + 0.5), c + 6 * math.sin(a + 0.5))
+            pygame.draw.polygon(s, (150, 215, 250), [tip, l, (c, c), rr])
+            pygame.draw.polygon(s, (230, 250, 255), [tip, l, (c, c)])
+            pygame.draw.polygon(s, (70, 140, 200), [tip, l, (c, c), rr], 1)
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (200, 240, 255), (c, c), 6), c, c, 6, 6), (0, 0))
+    elif key == "ninja":   # pagoda roof seen from above
+        for rad, col in ((16, (150, 30, 30)), (11, (190, 50, 45)), (6, (215, 70, 60))):
+            pts = [(c + rad * math.cos(i * math.pi / 4 + math.pi / 8), c + rad * math.sin(i * math.pi / 4 + math.pi / 8))
+                   for i in range(8)]
+            s.blit(lit(size, lambda p, pts=pts, col=col: pygame.draw.polygon(p, col, pts), c, c, rad, rad, 0.9), (0, 0))
+            pygame.draw.polygon(s, (90, 15, 15), pts, 1)
+        for i in range(8):
+            a = i * math.pi / 4 + math.pi / 8
+            pygame.draw.line(s, (110, 20, 20), (c, c), (c + 16 * math.cos(a), c + 16 * math.sin(a)), 1)
+        pygame.draw.circle(s, (240, 200, 60), (c, c), 3)
+    elif key == "sniper":   # sandbag nest
+        pygame.draw.circle(s, (70, 85, 50), (c, c), 13)
+        for i in range(8):
+            a = i * math.pi / 4
+            x, y = c + 13 * math.cos(a), c + 13 * math.sin(a)
+            s.blit(lit(size, lambda p, x=x, y=y: pygame.draw.ellipse(p, (200, 180, 130), (x - 6, y - 4, 12, 8)),
+                       x, y, 6, 4), (0, 0))
+    elif key == "wizard":   # stone tower top with a glowing magic circle
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (125, 115, 150), (c, c), 15), c, c, 15, 15), (0, 0))
+        pygame.draw.circle(s, (180, 110, 255), (c, c), 11, 2)
+        star = [(c + (10 if i % 2 == 0 else 4) * math.cos(i * math.pi / 5 - math.pi / 2),
+                 c + (10 if i % 2 == 0 else 4) * math.sin(i * math.pi / 5 - math.pi / 2)) for i in range(10)]
+        pygame.draw.polygon(s, (220, 170, 255), star)
+        pygame.draw.circle(s, (255, 240, 255), (c, c), 3)
+    elif key == "spike":   # steel spike press
         for i in range(4):
-            a = i * math.pi / 2 + 0.6
-            pygame.draw.circle(s, (240, 200, 255), (int(c + 12 * math.cos(a)), int(c + 12 * math.sin(a))), 2)
-    elif key == "wizard":
-        pygame.draw.circle(s, (110, 60, 170), (c, c), r)
-        pygame.draw.circle(s, (55, 25, 95), (c, c), r, 2)
-        pygame.draw.polygon(s, (70, 40, 140), [(c - 11, c + 6), (c + 11, c + 6), (c + 2, c - 15)])
-        pygame.draw.polygon(s, (40, 20, 80), [(c - 11, c + 6), (c + 11, c + 6), (c + 2, c - 15)], 2)
-        pygame.draw.circle(s, (255, 225, 80), (c + 1, c - 2), 3)
-    elif key == "mine":
-        rect = pygame.Rect(c - r + 1, c - r + 1, 2 * r - 2, 2 * r - 2)
-        pygame.draw.rect(s, (205, 165, 45), rect, border_radius=6)
-        pygame.draw.rect(s, (110, 75, 20), rect, 3, border_radius=6)
-        t = font.render("$", True, (110, 75, 20))
-        s.blit(t, t.get_rect(center=(c, c + 1)))
+            a = i * math.pi / 2 + math.pi / 4
+            for off in (-0.35, 0.35):
+                tip = (c + 19 * math.cos(a + off), c + 19 * math.sin(a + off))
+                pygame.draw.polygon(s, (200, 200, 215), [tip, (c + 10 * math.cos(a + off - 0.3), c + 10 * math.sin(a + off - 0.3)),
+                                                         (c + 10 * math.cos(a + off + 0.3), c + 10 * math.sin(a + off + 0.3))])
+        s.blit(lit(size, lambda p: pygame.draw.rect(p, (130, 135, 150), (c - 12, c - 12, 24, 24), border_radius=4),
+                   c, c, 15, 15, 0.8), (0, 0))
+        pygame.draw.rect(s, (60, 60, 75), (c - 12, c - 12, 24, 24), 2, border_radius=4)
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (235, 165, 60), (c, c), 6), c, c, 6, 6), (0, 0))
+    elif key == "village":   # thatched hut roof with a chimney
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (215, 175, 85), (c, c), 16), c, c, 16, 16, 1.2), (0, 0))
+        for i in range(16):
+            a = i * math.pi / 8
+            pygame.draw.line(s, (160, 120, 45), (c + 4 * math.cos(a), c + 4 * math.sin(a)),
+                             (c + 15 * math.cos(a), c + 15 * math.sin(a)), 1)
+        pygame.draw.circle(s, (120, 85, 30), (c, c), 16, 2)
+        pygame.draw.rect(s, (130, 70, 50), (c + 4, c - 9, 5, 5))
+        pygame.draw.line(s, (90, 60, 30), (c - 6, c - 4), (c - 6, c - 14), 1)
+        pygame.draw.polygon(s, (220, 50, 50), [(c - 6, c - 14), (c + 1, c - 12), (c - 6, c - 10)])
+    elif key == "super":   # glowing energy core
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (60, 110, 235), (c, c), 15), c, c, 15, 15, 1.4), (0, 0))
+        pygame.draw.circle(s, (255, 205, 60), (c, c), 15, 2)
+        star = [(c + (9 if i % 2 == 0 else 4) * math.cos(i * math.pi / 5 - math.pi / 2),
+                 c + (9 if i % 2 == 0 else 4) * math.sin(i * math.pi / 5 - math.pi / 2)) for i in range(10)]
+        pygame.draw.polygon(s, (255, 230, 90), star)
+    elif key == "mine":   # mine shaft with gold and a little cart
+        pygame.draw.rect(s, (115, 80, 45), (c - 12, c - 12, 24, 24), border_radius=3)
+        pygame.draw.rect(s, (25, 20, 15), (c - 8, c - 8, 16, 16))
+        pygame.draw.rect(s, (70, 45, 20), (c - 12, c - 12, 24, 24), 2, border_radius=3)
+        for x, y in ((c - 4, c - 3), (c + 3, c + 2), (c - 1, c + 4)):
+            s.blit(lit(size, lambda p, x=x, y=y: pygame.draw.circle(p, (245, 200, 50), (x, y), 3), x, y, 3, 3), (0, 0))
+        pygame.draw.rect(s, (90, 95, 105), (c + 5, c + 9, 10, 6), border_radius=2)
+    return s
+
+
+def make_water_sprite(key):
+    """Water towers seen from above, facing up (rotated toward their target in game)."""
+    w = 48
+    size = (w, w)
+    s = pygame.Surface(size, pygame.SRCALPHA)
+    c = w // 2
+    for rr, col in ((22, (60, 120, 190, 70)), (17, (90, 150, 210, 60))):   # dark water under it
+        pygame.draw.ellipse(s, col, (c - rr // 2 - 2, c - rr, rr + 4, rr * 2))
+    if key == "shark":
+        prof = [(6, 4), (11, 7), (18, 9), (24, 9), (30, 7), (36, 4), (40, 2)]
+        body = body_outline(w, prof, top=3)
+        for side in (-1, 1):   # pectoral fins
+            pygame.draw.polygon(s, (75, 95, 120), [(c + side * 7, 19), (c + side * 18, 29), (c + side * 6, 26)])
+        pygame.draw.polygon(s, (75, 95, 120), [(c, 38), (c - 8, 46), (c, 42), (c + 8, 46)])   # tail
+        s.blit(lit(size, lambda p: pygame.draw.polygon(p, (110, 135, 160), body), c, 22, 10, 20, 1.1), (0, 0))
+        pygame.draw.polygon(s, (60, 75, 95), body, 1)
+        pygame.draw.polygon(s, (65, 80, 100), [(c, 17), (c - 3, 27), (c + 3, 27)])   # dorsal fin
+        pygame.draw.line(s, (160, 180, 200), (c, 18), (c - 2, 26), 1)
+        for side in (-1, 1):
+            pygame.draw.circle(s, (15, 15, 20), (c + side * 4, 9), 2)
+            pygame.draw.line(s, (90, 105, 125), (c + side * 6, 14), (c + side * 7, 17), 1)   # gills
+    elif key == "pirate":
+        hull = [(c, 2), (c + 9, 12), (c + 11, 24), (c + 10, 40), (c + 7, 45), (c - 7, 45), (c - 10, 40), (c - 11, 24), (c - 9, 12)]
+        for y in (17, 25, 33):   # cannons poking out the sides
+            pygame.draw.rect(s, (25, 25, 30), (c - 14, y, 5, 3))
+            pygame.draw.rect(s, (25, 25, 30), (c + 9, y, 5, 3))
+        s.blit(lit(size, lambda p: pygame.draw.polygon(p, (130, 82, 40), hull), c, 24, 12, 22, 0.9), (0, 0))
+        deck = [(c, 6), (c + 7, 13), (c + 8, 24), (c + 7, 39), (c - 7, 39), (c - 8, 24), (c - 7, 13)]
+        pygame.draw.polygon(s, (185, 140, 85), deck)
+        for x in range(c - 6, c + 7, 3):
+            pygame.draw.line(s, (150, 105, 60), (x, 10), (x, 38), 1)
+        pygame.draw.polygon(s, (70, 40, 15), hull, 2)
+        for y, half, h in ((9, 8, 5), (21, 15, 8), (31, 12, 6)):   # sails, bulging forward
+            s.blit(lit(size, lambda p, y=y, half=half, h=h: pygame.draw.ellipse(p, (245, 240, 225), (c - half, y - h // 2, half * 2, h)),
+                       c, y, half, h, 0.7), (0, 0))
+            pygame.draw.line(s, (100, 70, 40), (c - half, y + 1), (c + half, y + 1), 1)
+            pygame.draw.circle(s, (80, 50, 25), (c, y + 1), 2)
+        pygame.draw.rect(s, (25, 25, 25), (c - 3, 41, 6, 5))
+        pygame.draw.circle(s, WHITE, (c, 43), 1)
+    elif key == "sub":
+        s.blit(lit(size, lambda p: pygame.draw.ellipse(p, (230, 190, 55), (c - 8, 3, 16, 40)), c, 23, 8, 20, 1.2), (0, 0))
+        pygame.draw.ellipse(s, (130, 100, 20), (c - 8, 3, 16, 40), 1)
+        for side in (-1, 1):
+            pygame.draw.rect(s, (200, 160, 45), (c + (3 if side > 0 else -11), 35, 8, 3), border_radius=1)
+        s.blit(lit(size, lambda p: pygame.draw.rect(p, (205, 165, 45), (c - 4, 14, 8, 13), border_radius=4), c, 20, 5, 7), (0, 0))
+        pygame.draw.circle(s, (60, 60, 70), (c, 16), 2)
+        for y in (9, 32):
+            pygame.draw.circle(s, (140, 210, 245), (c, y), 2)
+        pygame.draw.line(s, (110, 110, 120), (c - 4, 45), (c + 4, 45), 2)   # propeller
+        pygame.draw.line(s, (110, 110, 120), (c, 43), (c, 47), 2)
+    return s
+
+
+def make_hero_sprite(key):
+    """Each hero is its own little character, seen from the front.
+    The sprite is 52x62; the hero's feet are near the bottom middle."""
+    W, H = 52, 62
+    size = (W, H)
+    s = pygame.Surface(size, pygame.SRCALPHA)
+    cx = W // 2
+
+    def head(skin, y=18, r=7):
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, skin, (cx, y), r), cx, y, r, r, 0.8), (0, 0))
+
+    if key == "knight":   # armored knight: cape, shield, glowing sword
+        pygame.draw.polygon(s, (40, 70, 160), [(cx - 8, 24), (cx + 8, 24), (cx + 13, 54), (cx - 13, 54)])
+        for x in (cx - 6, cx + 1):
+            pygame.draw.rect(s, (120, 125, 140), (x, 44, 5, 10))
+            pygame.draw.rect(s, (60, 60, 70), (x - 1, 52, 7, 4), border_radius=2)
+        s.blit(lit(size, lambda p: pygame.draw.rect(p, (185, 190, 205), (cx - 9, 25, 18, 21), border_radius=6),
+                   cx, 34, 11, 12, 1.1), (0, 0))
+        pygame.draw.rect(s, (110, 80, 40), (cx - 9, 41, 18, 3))
+        pygame.draw.line(s, (255, 240, 150), (cx + 14, 42), (cx + 20, 8), 4)   # sword glow
+        pygame.draw.line(s, (200, 240, 255), (cx + 14, 42), (cx + 20, 8), 2)
+        pygame.draw.line(s, (120, 90, 40), (cx + 10, 40), (cx + 18, 42), 3)
+        shield = [(cx - 19, 28), (cx - 7, 28), (cx - 7, 41), (cx - 13, 47), (cx - 19, 41)]
+        s.blit(lit(size, lambda p: pygame.draw.polygon(p, (50, 90, 190), shield), cx - 13, 37, 7, 10), (0, 0))
+        pygame.draw.polygon(s, (220, 190, 70), shield, 2)
+        pygame.draw.polygon(s, (255, 220, 60), [(cx - 12, 31), (cx - 15, 38), (cx - 12, 38), (cx - 14, 44), (cx - 10, 36), (cx - 13, 36)])
+        s.blit(lit(size, lambda p: pygame.draw.circle(p, (190, 195, 210), (cx, 17), 9), cx, 17, 9, 9, 1.1), (0, 0))
+        pygame.draw.rect(s, (35, 40, 55), (cx - 6, 16, 12, 3), border_radius=1)
+        pygame.draw.line(s, (35, 40, 55), (cx, 16), (cx, 23), 2)
+        pygame.draw.polygon(s, (255, 215, 60), [(cx - 1, 2), (cx + 5, 8), (cx + 1, 8), (cx + 3, 12), (cx - 3, 6), (cx + 1, 6)])
+    elif key == "witch":   # teal dress, wide pointy hat, wind staff
+        pygame.draw.line(s, (110, 70, 35), (cx + 15, 56), (cx + 17, 14), 3)
+        for i, col in enumerate(((150, 240, 230), (220, 255, 250), (110, 210, 220))):
+            pygame.draw.circle(s, col, (cx + 17 + int(4 * math.cos(i * 2.1)), 11 + int(3 * math.sin(i * 2.1))), 5 - i, 2)
+        dress = [(cx - 7, 26), (cx + 7, 26), (cx + 14, 56), (cx - 14, 56)]
+        s.blit(lit(size, lambda p: pygame.draw.polygon(p, (50, 160, 150), dress), cx, 41, 14, 16), (0, 0))
+        pygame.draw.rect(s, (110, 50, 140), (cx - 8, 31, 16, 3))
+        head((235, 195, 165), 20)
+        pygame.draw.circle(s, (40, 30, 30), (cx - 3, 20), 1)
+        pygame.draw.circle(s, (40, 30, 30), (cx + 3, 20), 1)
+        pygame.draw.polygon(s, (70, 30, 90), [(cx - 8, 18), (cx - 10, 28), (cx - 6, 22)])   # hair
+        pygame.draw.polygon(s, (70, 30, 90), [(cx + 8, 18), (cx + 10, 28), (cx + 6, 22)])
+        s.blit(lit(size, lambda p: pygame.draw.ellipse(p, (30, 75, 85), (cx - 15, 11, 30, 7)), cx, 14, 15, 4), (0, 0))
+        s.blit(lit(size, lambda p: pygame.draw.polygon(p, (35, 85, 95), [(cx - 7, 14), (cx + 7, 14), (cx + 6, 0)]),
+                   cx, 8, 7, 8), (0, 0))
+        pygame.draw.rect(s, (200, 170, 60), (cx - 7, 11, 14, 2))
+    elif key == "gear":   # engineer: orange jumpsuit, goggles, bolt gun
+        for x in (cx - 6, cx + 1):
+            pygame.draw.rect(s, (200, 110, 40), (x, 44, 5, 9))
+            pygame.draw.rect(s, (40, 35, 30), (x - 1, 52, 7, 4), border_radius=2)
+        s.blit(lit(size, lambda p: pygame.draw.rect(p, (235, 135, 45), (cx - 9, 26, 18, 20), border_radius=5),
+                   cx, 35, 11, 12), (0, 0))
+        pygame.draw.rect(s, (100, 65, 30), (cx - 9, 40, 18, 4))
+        pygame.draw.rect(s, (240, 200, 60), (cx - 2, 40, 4, 4))
+        s.blit(lit(size, lambda p: pygame.draw.rect(p, (120, 125, 140), (cx + 4, 31, 20, 7), border_radius=2),
+                   cx + 14, 34, 10, 4), (0, 0))
+        for x in (cx + 9, cx + 13, cx + 17):
+            pygame.draw.line(s, (210, 120, 50), (x, 30), (x, 38), 2)
+        pygame.draw.circle(s, (130, 220, 255), (cx + 24, 34), 2)
+        head((205, 155, 115))
+        pygame.draw.rect(s, (90, 60, 35), (cx - 7, 10, 14, 4), border_radius=2)   # hair
+        pygame.draw.line(s, (50, 50, 55), (cx - 8, 17), (cx + 8, 17), 2)
+        for gx in (cx - 4, cx + 4):
+            pygame.draw.circle(s, (60, 60, 70), (gx, 17), 4)
+            pygame.draw.circle(s, (150, 220, 255), (gx, 17), 2)
+    elif key == "cipher":   # a friendly robot with a screen face
+        for x in (cx - 6, cx + 2):
+            pygame.draw.rect(s, (120, 125, 140), (x, 45, 5, 8))
+            pygame.draw.ellipse(s, (120, 200, 255), (x - 1, 53, 7, 4))   # hover jets
+        for side in (-1, 1):
+            pygame.draw.line(s, (130, 135, 150), (cx + side * 11, 29), (cx + side * 15, 40), 3)
+            pygame.draw.circle(s, (90, 95, 110), (cx + side * 11, 29), 3)
+            pygame.draw.circle(s, (90, 95, 110), (cx + side * 15, 41), 3)
+        s.blit(lit(size, lambda p: pygame.draw.rect(p, (115, 135, 175), (cx - 11, 25, 22, 21), border_radius=4),
+                   cx, 35, 13, 12, 1.1), (0, 0))
+        pygame.draw.rect(s, (40, 45, 60), (cx - 6, 29, 12, 7), border_radius=2)
+        for i, col in enumerate(((90, 255, 120), (255, 210, 60), (255, 80, 80))):
+            pygame.draw.circle(s, col, (cx - 4 + i * 4, 40), 1)
+        pygame.draw.line(s, (90, 95, 110), (cx, 7), (cx, 2), 2)   # antenna
+        pygame.draw.circle(s, (255, 70, 70), (cx, 2), 2)
+        s.blit(lit(size, lambda p: pygame.draw.rect(p, (150, 160, 190), (cx - 10, 7, 20, 17), border_radius=5),
+                   cx, 15, 12, 10, 1.1), (0, 0))
+        pygame.draw.rect(s, (20, 30, 40), (cx - 7, 10, 14, 10), border_radius=3)
+        pygame.draw.rect(s, (90, 255, 140), (cx - 5, 13, 3, 3))
+        pygame.draw.rect(s, (90, 255, 140), (cx + 2, 13, 3, 3))
+        pygame.draw.line(s, (90, 255, 140), (cx - 3, 18), (cx + 3, 18), 1)
+    elif key == "nova":   # a monk floating cross-legged, holding a glowing orb
+        glow = pygame.Surface(size, pygame.SRCALPHA)
+        pygame.draw.ellipse(glow, (200, 120, 255, 70), (cx - 18, 50, 36, 10))
+        s.blit(glow, (0, 0))
+        s.blit(lit(size, lambda p: pygame.draw.ellipse(p, (220, 120, 40), (cx - 16, 38, 32, 13)), cx, 44, 16, 7), (0, 0))
+        torso = [(cx - 8, 24), (cx + 8, 24), (cx + 11, 42), (cx - 11, 42)]
+        s.blit(lit(size, lambda p: pygame.draw.polygon(p, (230, 130, 45), torso), cx, 33, 11, 10), (0, 0))
+        pygame.draw.line(s, (140, 40, 50), (cx - 8, 25), (cx + 9, 41), 4)   # sash
+        head((180, 125, 90), 17, 8)
+        pygame.draw.arc(s, (60, 40, 30), (cx - 6, 16, 5, 4), math.pi, 2 * math.pi, 1)   # closed eyes
+        pygame.draw.arc(s, (60, 40, 30), (cx + 1, 16, 5, 4), math.pi, 2 * math.pi, 1)
+        pygame.draw.circle(s, (200, 140, 255), (cx, 12), 1)
+        pygame.draw.circle(s, (240, 190, 255), (cx, 36), 5)
+        pygame.draw.circle(s, (255, 250, 255), (cx, 36), 3)
+        for side in (-1, 1):
+            pygame.draw.circle(s, (180, 125, 90), (cx + side * 5, 38), 3)
     return s
 
 
@@ -1212,7 +1353,6 @@ def finish_tower_sprite(s):
 
 
 BARRELS = {   # (length, width, color) of the part that points at balloons
-    "gear": (20, 5, (70, 70, 80)),
     "dart": (22, 5, (70, 45, 25)),
     "bomb": (19, 10, (30, 30, 34)),
     "sniper": (28, 4, (40, 50, 25)),
@@ -2512,9 +2652,25 @@ class Game:
                 surf.blit(name, r)
 
     def draw_tower(self, surf, t):
-        surf.blit(self.app.tower_sprites[t.key], (t.x - 22, t.y - 22))
+        app = self.app
+        if t.hero:
+            now = pygame.time.get_ticks() / 1000.0
+            bob = {"nova": -4 + math.sin(now * 2.5) * 3, "witch": math.sin(now * 3) * 1.5}.get(t.key, 0)
+            spr = app.hero_sprites[(t.key, math.cos(t.angle) < -0.2)]   # face the way it attacks
+            surf.blit(spr, (t.x - spr.get_width() // 2, t.y - 40 + bob))
+            if t.key == "nova":   # glowing orbs circling the monk
+                for i in range(3):
+                    a = now * 2 + i * 2 * math.pi / 3
+                    ox, oy = t.x + math.cos(a) * 20, t.y - 12 + bob + math.sin(a) * 7
+                    pygame.draw.circle(surf, (200, 130, 255), (int(ox), int(oy)), 4)
+                    pygame.draw.circle(surf, (255, 235, 255), (int(ox), int(oy)), 2)
+        elif t.key in WATER_KEYS:
+            spr = app.rotated(t.key, t.angle)
+            surf.blit(spr, spr.get_rect(center=(int(t.x), int(t.y))))
+        else:
+            surf.blit(app.tower_sprites[t.key], (t.x - 22, t.y - 22))
         if t.hero:   # gold level badge
-            bx, by = int(t.x + 14), int(t.y + 14)
+            bx, by = int(t.x + 16), int(t.y + 12)
             pygame.draw.circle(surf, (120, 80, 10), (bx, by), 10)
             pygame.draw.circle(surf, (255, 205, 60), (bx, by), 9)
             img = self.app.text(self.app.f_tiny, str(t.hero_level), (60, 35, 0))
@@ -2526,6 +2682,10 @@ class Game:
             ex, ey = t.x + math.cos(t.angle) * length, t.y + math.sin(t.angle) * length
             pygame.draw.line(surf, col, (t.x, t.y), (ex, ey), width)
             pygame.draw.circle(surf, col, (int(t.x), int(t.y)), width // 2 + 3)
+            if t.key == "dart":   # a crossbow: bow across the front
+                px, py = -math.sin(t.angle) * 8, math.cos(t.angle) * 8
+                bx, by = t.x + math.cos(t.angle) * (length - 6), t.y + math.sin(t.angle) * (length - 6)
+                pygame.draw.line(surf, (60, 35, 15), (bx - px, by - py), (bx + px, by + py), 3)
         for p in range(len(t.levels)):
             x0 = t.x - 20 + p * 14
             for i in range(3):
@@ -2615,7 +2775,7 @@ class Game:
             if highlight and i == self.shop:
                 pygame.draw.rect(surf, PANEL_HI, (x + 2, PANEL_Y + 3, slot_w - 4, 62), border_radius=6)
                 pygame.draw.rect(surf, YELLOW, (x + 2, PANEL_Y + 3, slot_w - 4, 62), 2, border_radius=6)
-            spr = app.tower_sprites[tt["key"]]
+            spr = app.icons[tt["key"]]
             surf.blit(spr, (x + slot_w // 2 - 22, PANEL_Y + 2))
             img = app.text(app.f_small, "$%d" % cost, GREEN if self.money >= cost else (230, 110, 110))
             surf.blit(img, img.get_rect(center=(x + slot_w // 2, PANEL_Y + 54)))
@@ -2776,14 +2936,31 @@ class App:
         self.balloon_sprites = {(n, c): make_balloon_sprite(n, c)
                                 for n, i in BALLOON_TYPES.items() if not i.get("blimp") for c in (False, True)}
         self.blimp_sprites = {n: make_blimp_sprites(n) for n, i in BALLOON_TYPES.items() if i.get("blimp")}
-        self.tower_sprites = {tt["key"]: finish_tower_sprite(make_tower_sprite(tt["key"], self.f_med))
-                              for tt in SHOP}
+        self.tower_sprites = {}
+        for tt in TOWER_TYPES:
+            spr = make_tower_sprite(tt["key"], self.f_med)
+            self.tower_sprites[tt["key"]] = spr if tt["key"] in WATER_KEYS else finish_tower_sprite(spr)
+        self.hero_sprites = {}   # (key, facing left?) -> character picture
+        for h in HERO_TYPES:
+            spr = make_hero_sprite(h["key"])
+            self.hero_sprites[(h["key"], False)] = spr
+            self.hero_sprites[(h["key"], True)] = pygame.transform.flip(spr, True, False)
+        self.icons = {}          # 44x44 pictures for the shop and ability buttons
+        for key, spr in self.tower_sprites.items():
+            self.icons[key] = spr if spr.get_width() == 44 else pygame.transform.smoothscale(spr, (44, 44))
+        for h in HERO_TYPES:
+            spr = self.hero_sprites[(h["key"], False)]
+            icon = pygame.Surface((44, 44), pygame.SRCALPHA)
+            small = pygame.transform.smoothscale(spr, (int(spr.get_width() * 44 / spr.get_height()), 44))
+            icon.blit(small, small.get_rect(center=(22, 22)))
+            self.icons[h["key"]] = icon
+        self._rot = {}           # rotated water towers
         self.shadows = {}   # soft shadows, by size
         self._mini = {}     # small tower pictures
         self.hud_bg = self.gradient(SCREEN_W, HUD_H, (44, 50, 72), (22, 25, 36))
         self.panel_bg = self.gradient(SCREEN_W, PANEL_H, (46, 51, 70), (26, 29, 41))
         self.ghost_sprites = {}   # see-through copies for the "where will it go" preview
-        for key, spr in self.tower_sprites.items():
+        for key, spr in self.icons.items():
             ghost = spr.copy()
             ghost.set_alpha(170)
             self.ghost_sprites[key] = ghost
@@ -2800,7 +2977,11 @@ class App:
                                 random.choice(["red", "blue", "green", "yellow", "pink"]),
                                 random.uniform(25, 60)] for _ in range(14)]
         self.btn_hold = 0.0
-        self.title_idx = 0 if self.save.get("resume") else self.title_rows().index("start")
+        self.title_idx = 0       # main menu: Continue (if saved) or Play
+        self.play_idx = 2        # play screen: START
+        self.set_idx = 0
+        self.tab_idx = 0         # Towers & Heroes screen
+        self._previews = {}
 
     # ---------------------------------------------------------- caches
     def text(self, font, s, color):
@@ -2885,9 +3066,17 @@ class App:
             g.fill(tuple(int(top[i] + (bottom[i] - top[i]) * f) for i in range(3)), (0, y, w, 1))
         return g
 
+    def rotated(self, key, angle):
+        """A water tower turned to face angle (sprites face up), in 15-degree steps."""
+        step = int(round(((-math.degrees(angle) - 90) % 360) / 15)) % 24
+        k = (key, step)
+        if k not in self._rot:
+            self._rot[k] = pygame.transform.rotate(self.tower_sprites[key], step * 15)
+        return self._rot[k]
+
     def mini_sprite(self, key):
         if key not in self._mini:
-            self._mini[key] = pygame.transform.smoothscale(self.tower_sprites[key], (30, 30))
+            self._mini[key] = pygame.transform.smoothscale(self.icons[key], (30, 30))
         return self._mini[key]
 
     def shadow(self, w, h):
@@ -2965,7 +3154,7 @@ class App:
     def go_title(self):
         self.state = "title"
         self.game = None
-        self.title_idx = 0 if self.save.get("resume") else self.title_rows().index("start")
+        self.title_idx = 0
 
     def change_volume(self, step):
         """Move the sound slider by step (in %), save it, and play a test pop."""
@@ -3007,94 +3196,319 @@ class App:
                 pygame.draw.rect(surf, YELLOW, r.inflate(40, 14), 2, border_radius=10)
             surf.blit(img, r)
 
+    # ---------------------------------------------------------- home screens
+    # Main menu -> Play (pick map + difficulty) / Settings / How to play
     def title_rows(self):
         rows = ["continue"] if self.save.get("resume") else []
-        return rows + ["map", "mode", "auto", "sound", "start", "help", "buttons", "quit"]
+        return rows + ["play", "towers", "settings", "help", "quit"]
 
-    def title_items(self):
-        labels = []
-        for row in self.title_rows():
-            if row == "continue":
-                snap = self.save["resume"]
-                labels.append("Continue: %s R%d" % (MAPS[snap["map"]]["name"], snap["round"] + 1))
-            elif row == "map":
-                labels.append("Map: < %s >" % MAPS[self.map_idx]["name"])
-            elif row == "mode":
-                labels.append("Mode: < %s >" % DIFFICULTIES[self.diff_idx]["name"])
-            elif row == "auto":
-                labels.append("Auto-start: < %s >" % ("ON" if self.save.get("auto_start") else "OFF"))
-            elif row == "sound":
-                labels.append(SOUND_ROW)
-            else:
-                labels.append({"start": "Start game", "help": "How to play",
-                               "buttons": "Button test", "quit": "Quit"}[row])
-        return labels
+    PLAY_ROWS = ["map", "mode", "start", "back"]
+    SETTINGS_ROWS = ["auto", "sound", "buttons", "back"]
 
-    def update_title(self, dt):
-        inp = self.inp
-        rows = self.title_rows()
-        n = len(rows)
-        self.title_idx %= n
-        if "UP" in inp.repeat:
-            self.title_idx = (self.title_idx - 1) % n
-        if "DOWN" in inp.repeat:
-            self.title_idx = (self.title_idx + 1) % n
-        row = rows[self.title_idx]
-        step = ("RIGHT" in inp.repeat) - ("LEFT" in inp.repeat)
-        go = "A" in inp.pressed or "START" in inp.pressed
-        if row == "map" and step:
-            self.map_idx = (self.map_idx + step) % len(MAPS)
-        elif row == "mode" and step:
-            self.diff_idx = (self.diff_idx + step) % len(DIFFICULTIES)
-        elif row == "auto" and (step or "A" in inp.pressed):
-            self.set_auto_start(not self.save.get("auto_start"))
-        elif row == "sound":
-            if step:
-                self.change_volume(10 * step)
-            elif "A" in inp.pressed:   # A on the slider: mute / unmute
-                self.change_volume(-100 if self.save.get("volume", 70) else 70)
-        elif go:
-            if row == "continue":
-                self.continue_game()
-            elif row in ("map", "mode", "start"):
-                self.game = Game(self, self.map_idx, self.diff_idx)
-                self.state = "game"
-            elif row == "help":
-                self.state = "help"
-            elif row == "buttons":
-                self.state = "buttons"
-                self.btn_hold = 0.0
-            elif row == "quit":
-                self.running = False
+    def make_title_bg(self):
+        """Sky, clouds and rolling hills behind the menus (drawn once)."""
+        bg = self.gradient(SCREEN_W, SCREEN_H, (95, 165, 240), (200, 230, 255))
+        rnd = random.Random(4)
+        cloud = pygame.Surface((160, 70), pygame.SRCALPHA)
+        for _ in range(6):
+            cloud.fill((0, 0, 0, 0))
+            for _ in range(6):
+                pygame.draw.ellipse(cloud, (255, 255, 255, 150),
+                                    (rnd.randint(0, 80), rnd.randint(10, 30), rnd.randint(50, 80), rnd.randint(28, 40)))
+            bg.blit(cloud, (rnd.randint(-40, SCREEN_W - 100), rnd.randint(10, 330)))
+        for col, base, amp, ph in (((120, 190, 100), 520, 30, 0.5), ((90, 165, 75), 560, 25, 2.0)):
+            pts = [(x, base - amp * math.sin(x / 80 + ph)) for x in range(0, SCREEN_W + 10, 10)]
+            pygame.draw.polygon(bg, col, pts + [(SCREEN_W, SCREEN_H), (0, SCREEN_H)])
+        pts = [(x, 600 - 18 * math.sin(x / 60)) for x in range(0, SCREEN_W + 10, 10)]   # a dirt track
+        pygame.draw.lines(bg, (170, 135, 85), False, pts, 30)
+        pygame.draw.lines(bg, (214, 186, 130), False, pts, 24)
+        return bg.convert()
+
+    def draw_title_bg(self, surf):
+        if not hasattr(self, "_title_bg"):
+            self._title_bg = self.make_title_bg()
+        surf.blit(self._title_bg, (0, 0))
+        for x, y, name, _ in self.title_balloons:
+            spr, ox, oy = self.balloon_sprites[(name, False)]
+            surf.blit(spr, (x - ox, y - oy))
+
+    def draw_logo(self, surf, y=62):
+        for i, (word, col) in enumerate((("BALLOON", (255, 230, 80)), ("BLITZ", (255, 110, 110)))):
+            img = self.text(self.f_big, word, col)
+            out = self.text(self.f_big, word, (40, 30, 70))
+            r = img.get_rect(center=(SCREEN_W // 2, y + i * 54))
+            for dx, dy in ((-3, 0), (3, 0), (0, -3), (0, 3), (4, 5)):   # thick outline + shadow
+                surf.blit(out, r.move(dx, dy))
+            surf.blit(img, r)
+
+    def draw_button(self, surf, rect, label, selected, color=(70, 90, 150), sub=None):
+        rect = pygame.Rect(rect)
+        pygame.draw.rect(surf, (20, 25, 45), rect.move(0, 5), border_radius=14)   # shadow
+        top = tuple(min(255, c + (40 if selected else 15)) for c in color)
+        pygame.draw.rect(surf, top, rect, border_radius=14)
+        pygame.draw.rect(surf, color, (rect.x, rect.centery, rect.w, rect.h // 2), border_bottom_left_radius=14,
+                         border_bottom_right_radius=14)
+        pygame.draw.rect(surf, YELLOW if selected else (25, 30, 50), rect, 3 if selected else 2, border_radius=14)
+        img = self.text(self.f_med, label, YELLOW if selected else WHITE)
+        cy = rect.centery - (8 if sub else 0)
+        surf.blit(img, img.get_rect(center=(rect.centerx, cy)))
+        if sub:
+            img = self.text(self.f_small, sub, (220, 225, 240))
+            surf.blit(img, img.get_rect(center=(rect.centerx, cy + 22)))
+
+    def animate_title(self, dt):
         for b in self.title_balloons:
             b[1] -= b[3] * dt
             if b[1] < -30:
                 b[0], b[1] = random.uniform(0, SCREEN_W), SCREEN_H + 30
 
+    def menu_move(self, idx, n):
+        if "UP" in self.inp.repeat:
+            idx = (idx - 1) % n
+        if "DOWN" in self.inp.repeat:
+            idx = (idx + 1) % n
+        return idx % n
+
+    # ----- main menu
+    def update_title(self, dt):
+        self.animate_title(dt)
+        rows = self.title_rows()
+        self.title_idx = self.menu_move(self.title_idx, len(rows))
+        if not ("A" in self.inp.pressed or "START" in self.inp.pressed):
+            return
+        row = rows[self.title_idx]
+        if row == "continue":
+            self.continue_game()
+        elif row == "play":
+            self.state, self.play_idx = "play", self.PLAY_ROWS.index("start")
+        elif row == "settings":
+            self.state, self.set_idx = "settings", 0
+        elif row == "towers":
+            self.state = "towers"
+        elif row == "help":
+            self.state = "help"
+        elif row == "quit":
+            self.running = False
+
     def draw_title(self, surf):
-        surf.fill((70, 140, 220))
-        for x, y, name, _ in self.title_balloons:
-            spr, ox, oy = self.balloon_sprites[(name, False)]
-            surf.blit(spr, (x - ox, y - oy))
-        for i, (word, col) in enumerate((("BALLOON", (255, 230, 80)), ("BLITZ", (255, 110, 110)))):
-            img = self.text(self.f_big, word, col)
-            sh = self.text(self.f_big, word, (30, 30, 60))
-            r = img.get_rect(center=(SCREEN_W // 2, 50 + i * 52))
-            surf.blit(sh, r.move(3, 3))
-            surf.blit(img, r)
-        # map preview
-        thumb = pygame.transform.smoothscale(self.map_bg(self.map_idx), (124, 124))
-        tr = thumb.get_rect(center=(SCREEN_W // 2, 196))
-        pygame.draw.rect(surf, WHITE, tr.inflate(6, 6), border_radius=4)
-        surf.blit(thumb, tr)
+        self.draw_title_bg(surf)
+        self.draw_logo(surf)
+        rows = self.title_rows()
+        y = 186 if len(rows) > 5 else 205
+        for i, row in enumerate(rows):
+            sub = None
+            if row == "continue":
+                snap = self.save["resume"]
+                label, color = "Continue", (60, 150, 90)
+                sub = "%s  -  round %d" % (MAPS[snap["map"]]["name"], snap["round"] + 1)
+            else:
+                label = {"play": "Play", "towers": "Towers & Heroes", "settings": "Settings",
+                         "help": "How to Play", "quit": "Quit"}[row]
+                color = (215, 120, 40) if row == "play" else (120, 80, 160) if row == "towers" else (70, 90, 150)
+            h = 60 if sub else 50
+            self.draw_button(surf, (90, y, 300, h), label, i == self.title_idx, color, sub)
+            y += h + 12
+        img = self.text(self.f_small, "D-pad: choose    A: OK", (40, 60, 40))
+        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 628 - 20)))
+        img = self.text(self.f_tiny, VERSION, (40, 60, 90))
+        surf.blit(img, (SCREEN_W - img.get_width() - 8, 6))
+
+    # ----- play: pick a map and a difficulty
+    def map_preview(self, idx, size):
+        key = (idx, size)
+        if key not in self._previews:
+            self._previews[key] = pygame.transform.smoothscale(self.map_bg(idx), (size, size))
+        return self._previews[key]
+
+    def update_play(self, dt):
+        self.animate_title(dt)
+        self.play_idx = self.menu_move(self.play_idx, len(self.PLAY_ROWS))
+        row = self.PLAY_ROWS[self.play_idx]
+        step = ("RIGHT" in self.inp.repeat) - ("LEFT" in self.inp.repeat)
+        if row == "map" and step:
+            self.map_idx = (self.map_idx + step) % len(MAPS)
+        elif row == "mode" and step:
+            self.diff_idx = (self.diff_idx + step) % len(DIFFICULTIES)
+        if "B" in self.inp.pressed or ("A" in self.inp.pressed and row == "back"):
+            self.state = "title"
+        elif ("A" in self.inp.pressed and row != "back") or "START" in self.inp.pressed:
+            self.game = Game(self, self.map_idx, self.diff_idx)
+            self.state = "game"
+
+    def draw_play(self, surf):
+        self.draw_title_bg(surf)
+        row = self.PLAY_ROWS[self.play_idx]
+        img = self.text(self.f_med, "Choose a Map", WHITE)
+        out = self.text(self.f_med, "Choose a Map", (40, 30, 70))
+        r = img.get_rect(center=(SCREEN_W // 2, 34))
+        surf.blit(out, r.move(2, 3))
+        surf.blit(img, r)
+        # the map card
+        card = pygame.Rect(60, 60, 360, 350)
+        pygame.draw.rect(surf, (20, 25, 45), card.move(0, 6), border_radius=16)
+        pygame.draw.rect(surf, (40, 48, 75), card, border_radius=16)
+        pygame.draw.rect(surf, YELLOW if row == "map" else (90, 100, 140), card, 3, border_radius=16)
+        prev = self.map_preview(self.map_idx, 230)
+        pr = prev.get_rect(center=(SCREEN_W // 2, 190))
+        pygame.draw.rect(surf, WHITE, pr.inflate(8, 8), border_radius=6)
+        surf.blit(prev, pr)
+        for side in (-1, 1):   # arrows to flip through maps
+            ax = SCREEN_W // 2 + side * 152
+            col = YELLOW if row == "map" else (150, 160, 190)
+            pygame.draw.polygon(surf, col, [(ax + side * 12, 190), (ax - side * 6, 172), (ax - side * 6, 208)])
         mp = MAPS[self.map_idx]
-        info = "%s map  -  Best: round %d" % (mp["level"], self.best(self.map_idx, self.diff_idx))
-        img = self.text(self.f_small, info, WHITE)
-        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 276)))
-        self.draw_menu_list(surf, self.title_items(), self.title_idx, 300 if self.save.get("resume") else 316,
-                            38 if self.save.get("resume") else 42)
-        img = self.text(self.f_small, VERSION, (190, 210, 240))
-        surf.blit(img, (SCREEN_W - img.get_width() - 6, 4))
+        img = self.text(self.f_med, mp["name"], WHITE)
+        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 334)))
+        badge_col = {"Easy": (70, 180, 80), "Medium": (220, 170, 40), "Hard": (210, 70, 60)}[mp["level"]]
+        badge = self.text(self.f_small, mp["level"], WHITE)
+        best = self.best(self.map_idx, self.diff_idx)
+        info = self.text(self.f_small, ("Best: round %d" % best) + ("  - beaten!" if best >= WIN_ROUND else ""),
+                         (255, 220, 120) if best >= WIN_ROUND else (200, 205, 225))
+        total = badge.get_width() + 24 + 14 + info.get_width()
+        bx = SCREEN_W // 2 - total // 2
+        br = pygame.Rect(bx, 360, badge.get_width() + 24, 30)
+        pygame.draw.rect(surf, badge_col, br, border_radius=15)
+        surf.blit(badge, badge.get_rect(center=br.center))
+        surf.blit(info, (br.right + 14, br.centery - info.get_height() // 2))
+        # difficulty
+        diff = DIFFICULTIES[self.diff_idx]
+        self.draw_button(surf, (90, 426, 300, 58), "< %s >" % diff["name"], row == "mode", (70, 90, 150),
+                         "%d lives  -  $%d to start" % (diff["lives"], diff["money"] + mp.get("extra_money", 0)))
+        self.draw_button(surf, (90, 500, 300, 56), "START!", row == "start", (60, 160, 70))
+        self.draw_button(surf, (170, 572, 140, 42), "Back", row == "back", (90, 90, 110))
+
+    # ----- towers & heroes: every upgrade, one tab per tower (L/R to switch)
+    def wrap(self, text, font, width):
+        words, lines, line = text.split(), [], ""
+        for w in words:
+            test = (line + " " + w).strip()
+            if font.size(test)[0] <= width:
+                line = test
+            else:
+                lines.append(line)
+                line = w
+        return lines + [line] if line else lines
+
+    def update_towers(self, dt):
+        inp = self.inp
+        if "L" in inp.repeat or "LEFT" in inp.repeat or "UP" in inp.repeat:
+            self.tab_idx = (self.tab_idx - 1) % len(SHOP)
+        if "R" in inp.repeat or "RIGHT" in inp.repeat or "DOWN" in inp.repeat:
+            self.tab_idx = (self.tab_idx + 1) % len(SHOP)
+        if "B" in inp.pressed or "A" in inp.pressed:
+            self.state = "title"
+
+    def draw_towers(self, surf):
+        surf.fill((30, 34, 50))
+        tt = SHOP[self.tab_idx]
+        # tab strip with every tower's icon
+        pygame.draw.rect(surf, (22, 25, 38), (0, 0, SCREEN_W, 58))
+        shown = 8
+        first = max(0, min(self.tab_idx - shown // 2, len(SHOP) - shown))
+        for i in range(first, first + shown):
+            x = 26 + (i - first) * 54
+            sel = i == self.tab_idx
+            rect = pygame.Rect(x - 25, 4, 50, 50)
+            pygame.draw.rect(surf, (70, 80, 120) if sel else (40, 45, 65), rect, border_radius=10)
+            if sel:
+                pygame.draw.rect(surf, YELLOW, rect, 3, border_radius=10)
+            surf.blit(pygame.transform.smoothscale(self.icons[SHOP[i]["key"]], (40, 40)), (x - 20, 9))
+        for side, show in ((-1, first > 0), (1, first + shown < len(SHOP))):
+            if show:
+                ax = 3 if side < 0 else SCREEN_W - 3
+                pygame.draw.polygon(surf, YELLOW, [(ax, 29), (ax - side * 7, 21), (ax - side * 7, 37)])
+        # the tower itself
+        if tt.get("hero"):
+            big = pygame.transform.smoothscale(self.hero_sprites[(tt["key"], False)], (78, 93))
+        else:
+            big = pygame.transform.smoothscale(self.icons[tt["key"]], (88, 88))
+        surf.blit(big, big.get_rect(center=(62, 120)))
+        surf.blit(self.text(self.f_med, tt["name"], YELLOW), (116, 70))
+        kind = "Hero" if tt.get("hero") else "Water tower" if tt.get("water") else "Tower"
+        surf.blit(self.text(self.f_small, "%s  -  $%d" % (kind, tt["cost"]), (160, 210, 255)), (116, 104))
+        for j, line in enumerate(self.wrap(tt["desc"], self.f_small, 350)[:2]):
+            surf.blit(self.text(self.f_small, line, WHITE), (116, 128 + j * 22))
+        y = 180
+        if tt.get("hero"):
+            surf.blit(self.text(self.f_norm, "Levels up by itself: 1 to 20", (255, 215, 80)), (16, y))
+            y += 36
+            for lvl in (1, 10, 20):
+                txt = "Level %2d:  %s" % (lvl, stat_summary(hero_stats(tt["key"], lvl)))
+                surf.blit(self.text(self.f_small, txt[:44], (200, 210, 230)), (24, y))
+                y += 28
+            y += 12
+            surf.blit(self.text(self.f_norm, "Abilities", (255, 215, 80)), (16, y))
+            y += 34
+            for lvl, aid in tt["abilities"]:
+                name, cd, desc = ABILITIES[aid]
+                card = pygame.Rect(16, y, SCREEN_W - 32, 64)
+                pygame.draw.rect(surf, (45, 52, 80), card, border_radius=10)
+                pygame.draw.rect(surf, (110, 220, 110), card, 2, border_radius=10)
+                surf.blit(self.text(self.f_norm, "%s  (level %d)" % (name, lvl), WHITE), (28, y + 8))
+                surf.blit(self.text(self.f_small, "%s  -  recharges in %ds" % (desc, cd), (190, 200, 220)), (28, y + 36))
+                y += 76
+        else:
+            names = ("Top path", "Middle path (ability)", "Bottom path")
+            for p, path in enumerate(tt["paths"]):
+                surf.blit(self.text(self.f_small, names[p], PATH_COLORS[p]), (14, y))
+                y += 22
+                for k, (name, cost, desc, fx) in enumerate(path):
+                    card = pygame.Rect(10 + k * 156, y, 150, 86)
+                    pygame.draw.rect(surf, (45, 52, 80), card, border_radius=10)
+                    pygame.draw.rect(surf, PATH_COLORS[p], card, 2, border_radius=10)
+                    title = ("* " if "ability" in fx else "") + name
+                    surf.blit(self.text(self.f_tiny, "LV %d" % (k + 1), PATH_COLORS[p]), (card.x + 8, card.y + 6))
+                    cost_img = self.text(self.f_tiny, "$%d" % cost, GREEN)
+                    surf.blit(cost_img, (card.right - cost_img.get_width() - 8, card.y + 6))
+                    tfont = self.f_small if self.f_small.size(title)[0] <= 134 else self.f_tiny
+                    surf.blit(self.text(tfont, title, YELLOW if "ability" in fx else WHITE), (card.x + 8, card.y + 22))
+                    for j, line in enumerate(self.wrap(desc, self.f_tiny, 136)[:3]):
+                        surf.blit(self.text(self.f_tiny, line, (190, 200, 220)), (card.x + 8, card.y + 46 + j * 14))
+                y += 96
+            surf.blit(self.text(self.f_tiny, "* = ability (use with L + R).  Only 2 paths per tower; one can reach level 3.",
+                                (160, 170, 200)), (12, y))
+        pygame.draw.rect(surf, (22, 25, 38), (0, SCREEN_H - 30, SCREEN_W, 30))
+        img = self.text(self.f_small, "L / R: switch tab     B: back", (200, 205, 225))
+        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, SCREEN_H - 15)))
+
+    # ----- settings
+    def update_settings(self, dt):
+        self.animate_title(dt)
+        self.set_idx = self.menu_move(self.set_idx, len(self.SETTINGS_ROWS))
+        row = self.SETTINGS_ROWS[self.set_idx]
+        step = ("RIGHT" in self.inp.repeat) - ("LEFT" in self.inp.repeat)
+        if "B" in self.inp.pressed or ("A" in self.inp.pressed and row == "back"):
+            self.state = "title"
+        elif row == "auto" and (step or "A" in self.inp.pressed):
+            self.set_auto_start(not self.save.get("auto_start"))
+        elif row == "sound":
+            if step:
+                self.change_volume(10 * step)
+            elif "A" in self.inp.pressed:   # A on the slider: mute / unmute
+                self.change_volume(-100 if self.save.get("volume", 70) else 70)
+        elif row == "buttons" and "A" in self.inp.pressed:
+            self.state = "buttons"
+            self.btn_hold = 0.0
+
+    def draw_settings(self, surf):
+        self.draw_title_bg(surf)
+        img = self.text(self.f_big, "Settings", WHITE)
+        out = self.text(self.f_big, "Settings", (40, 30, 70))
+        r = img.get_rect(center=(SCREEN_W // 2, 70))
+        surf.blit(out, r.move(3, 4))
+        surf.blit(img, r)
+        panel = pygame.Rect(40, 130, 400, 360)
+        pygame.draw.rect(surf, (20, 25, 45), panel.move(0, 6), border_radius=18)
+        pygame.draw.rect(surf, (40, 48, 75), panel, border_radius=18)
+        items = ["Auto-start: < %s >" % ("ON" if self.save.get("auto_start") else "OFF"),
+                 SOUND_ROW, "Button test", "Back"]
+        self.draw_menu_list(surf, items, self.set_idx, 190, 78)
+        tips = {"auto": "Start the next round by itself",
+                "sound": "LEFT/RIGHT: volume   A: mute",
+                "buttons": "Check your handheld's buttons",
+                "back": "Back to the main menu"}
+        img = self.text(self.f_small, tips[self.SETTINGS_ROWS[self.set_idx]], (40, 60, 40))
+        surf.blit(img, img.get_rect(center=(SCREEN_W // 2, 540)))
 
     HELP = [
         ("GOAL", YELLOW),
@@ -3199,6 +3613,18 @@ class App:
             if self.state == "title":
                 self.update_title(dt)
                 self.draw_title(self.canvas)
+            elif self.state == "play":
+                self.update_play(dt)
+                if self.state == "play":
+                    self.draw_play(self.canvas)
+            elif self.state == "settings":
+                self.update_settings(dt)
+                if self.state == "settings":
+                    self.draw_settings(self.canvas)
+            elif self.state == "towers":
+                self.update_towers(dt)
+                if self.state == "towers":
+                    self.draw_towers(self.canvas)
             elif self.state == "help":
                 if "A" in self.inp.pressed or "B" in self.inp.pressed:
                     self.state = "title"

@@ -4,6 +4,17 @@ A balloon-popping tower defense game (inspired by Bloons TD 6) for the
 homemade Raspberry Pi handheld. To play it on a computer, use the
 emulator in [`../pc-tester`](../pc-tester).
 
+## Home screen
+
+- **Continue**: carry on your saved game (shown when you have one)
+- **Play**: pick a map (left/right flips through them, with a picture, difficulty badge
+  and your best round), pick Easy / Normal / Hard, then **START!**
+- **Towers & Heroes**: every tower and hero has its own tab. Flip through them with
+  the **L / R** bumpers to see all 9 upgrades (3 paths) and every ability, or a hero's
+  stats and abilities as it levels up
+- **Settings**: auto-start, sound slider and the button test
+- **How to Play** and **Quit**
+
 ## How to play
 
 - Balloons follow the dirt track. Pop them before they reach the end.
@@ -83,6 +94,10 @@ All towers got a power boost from playtesting: they attack 15% faster, and darts
 tacks, boomerangs, stars, magic and the Super Tower pop one extra balloon per shot.
 
 ### Heroes
+
+Each hero is its own character standing on the map (not a tower): an armored
+**knight**, a **witch** with a wind staff, an **engineer** with a coil gun, **Cipher the
+robot**, and **Nova the monk** who floats with glowing orbs around them.
 
 Buy **one hero per game** from the end of the shop. Heroes have no upgrade
 paths: they **level up by themselves, from 1 to 20**, by popping balloons and
